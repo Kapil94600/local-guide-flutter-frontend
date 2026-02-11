@@ -30,21 +30,27 @@ export default function UserDashboard({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (!location?.id) return;
-    fetchHomeData(location.id);
+    if (!location?.latitude || !location?.longitude) return;
+    fetchHomeData(location.latitude, location.longitude);
   }, [location]);
 
-  const fetchHomeData = async (placeId) => {
+  const fetchHomeData = async (latitude, longitude) => {
     try {
       setLoadingPlaces(true);
-      console.log("Fetching places for locationId:", placeId);
+      console.log("Fetching places for lat/lng:", latitude, longitude);
 
-      // ✅ Places POST request
-      const placesRes = await api.post(API.GET_PLACES, { locationId: placeId });
+      // ✅ Places POST request (backend expects latitude/longitude)
+      const placesRes = await api.post(API.GET_PLACES, {
+        latitude,
+        longitude,
+        page: 1,
+        perPage: 10,
+      });
       console.log("Places Response:", placesRes.data);
 
-      const guidersRes = await api.post("/guider/get_by_place", { placeId });
-      const photographersRes = await api.post("/photographers/get_by_place", { placeId });
+      // ✅ Guiders & Photographers by place (if backend supports)
+      const guidersRes = await api.post("/guider/get_by_place", { latitude, longitude });
+      const photographersRes = await api.post("/photographers/get_by_place", { latitude, longitude });
 
       setHomeData({
         places: placesRes.data?.data || [],
@@ -195,8 +201,9 @@ function PlaceCard({ item, navigation }) {
       style={styles.placeCard}
       onPress={() => navigation.navigate("PlaceDetails", { placeId: item.id })}
     >
-      <Text style={styles.placeTitle}>{item.name}</Text>
-      <Text style={styles.placeRating}>⭐ {item.rating}</Text>
+      {/* ✅ Use placeName instead of name */}
+      <Text style={styles.placeTitle}>{item.placeName}</Text>
+      <Text style={styles.placeRating}>⭐ {item.rating || 0}</Text>
     </TouchableOpacity>
   );
 }
@@ -209,9 +216,10 @@ function PersonCard({ item, role, navigation }) {
         navigation.navigate("PersonDetails", { id: item.id, role })
       }
     >
-      <Text style={styles.personName}>{item.name}</Text>
+      {/* ✅ Use correct field (name/fullName/username) */}
+      <Text style={styles.personName}>{item.name || item.fullName || item.username}</Text>
       <Text style={styles.personMeta}>
-        ⭐ {item.rating} · {role}
+        ⭐ {item.rating || 0} · {role}
       </Text>
     </TouchableOpacity>
   );
@@ -220,7 +228,7 @@ function PersonCard({ item, role, navigation }) {
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: "#3a0250e3",
+    backgroundColor: "#42738fe3",
     paddingTop: 46,
     paddingHorizontal: 16,
     paddingBottom: 28,
@@ -236,7 +244,7 @@ const styles = StyleSheet.create({
   headerIcons: { flexDirection: "row", gap: 14 },
 
   heroWrapper: { marginTop: 16, alignItems: "center", width: "100%", marginBottom: 32 },
-  heroCard: { width: "90%", height: 200, borderRadius: 24, backgroundColor: "#7a528a", overflow: "hidden" },
+  heroCard: { width: "90%", height: 200, borderRadius: 24, backgroundColor: "#678191e3", overflow: "hidden" },
   heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)", borderRadius: 24 },
   heroTextWrapper: { position: "absolute", top: 24, left: 24, right: 24 },
   heroText: { fontSize: 22, fontWeight: "800", color: "#fff" },
@@ -265,7 +273,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 18,
     marginLeft: 16,
-    backgroundColor: "#8c5298",
+    backgroundColor: "#42738fe3",
     justifyContent: "center",
     paddingLeft: 12,
   },

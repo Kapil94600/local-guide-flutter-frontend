@@ -50,50 +50,54 @@ export default function UserEditProfileScreen({ navigation }) {
     }
   };
 
-  /* SAVE PROFILE (MULTIPART – FLUTTER STYLE) */
+  /* SAVE PROFILE */
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert("Validation", "Name is required");
-      return;
+  if (!name.trim()) {
+    Alert.alert("Validation", "Name is required");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const formData = new FormData();
+    formData.append("userId", user.user_Id?.toString() || user.id?.toString()); // 👈 mandatory
+    formData.append("name", name);
+    formData.append("phone", phone);
+    formData.append("email", email);
+    formData.append("username", username);
+    formData.append("address", address);
+
+    // optional fields
+    formData.append("gender", "male");
+    formData.append("dob", "1998-06-15");
+
+    if (image?.uri) {
+      formData.append("profile", {
+        uri: image.uri,
+        name: `profile_${Date.now()}.jpg`,
+        type: "image/jpeg",
+      });
     }
 
-    try {
-      setLoading(true);
+    const res = await api.post(API.UPDATE_PROFILE, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-      const formData = new FormData();
-      formData.append("userId", user.id.toString());
-      formData.append("name", name);
-      formData.append("phone", phone);
-      formData.append("email", email);
-      formData.append("username", username);
-      formData.append("address", address);
-
-      if (image?.uri) {
-        formData.append("profile", {
-          uri: image.uri,
-          name: `profile_${Date.now()}.jpg`,
-          type: "image/jpeg",
-        });
-      }
-
-      const res = await api.post(API.UPDATE_PROFILE, formData);
-
-      if (!res?.data?.success) {
-        throw new Error(res?.data?.message);
-      }
-
-      // update local user (same as flutter $user.saveDetails)
-      setUser(res.data.data);
-
-      Alert.alert("Success", "Profile updated successfully");
-      navigation.goBack();
-    } catch (err) {
-      console.log("PROFILE UPDATE ERROR 👉", err?.response?.data || err);
-      Alert.alert("Error", "Something went wrong");
-    } finally {
-      setLoading(false);
+    if (!res?.data?.success) {
+      throw new Error(res?.data?.message);
     }
-  };
+
+    setUser(res.data.data);
+    Alert.alert("Success", "Profile updated successfully");
+    navigation.goBack();
+  } catch (err) {
+    console.log("PROFILE UPDATE ERROR 👉", err?.response?.data || err);
+    Alert.alert("Error", err?.response?.data?.message || "Something went wrong");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <ScrollView style={styles.container}>
@@ -113,7 +117,7 @@ export default function UserEditProfileScreen({ navigation }) {
             source={{
               uri:
                 image?.uri ||
-                user?.profile ||
+                user?.profile_Image_Url ||
                 "https://via.placeholder.com/150",
             }}
             style={styles.image}
@@ -162,7 +166,7 @@ const Input = ({ label, value, onChangeText }) => (
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
   header: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#446f94e3",
     paddingTop: 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -200,7 +204,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   btn: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#3a0250e3",
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",

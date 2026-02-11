@@ -6,14 +6,17 @@ import AdminDashboard from "../screens/AdminDashboard";
 import UserListScreen from "../screens/Admin/UserListScreen";
 import TransactionListScreen from "../screens/Admin/TransactionListScreen";
 import GuiderList from "../screens/Admin/GuiderList";
+import GuiderRequests from "../screens/Admin/GuiderRequests";
+import PhotographerRequests from "../screens/Admin/PhotographerRequests";
+import PhotographerList from "../screens/Admin/PhotographerList";
 import PlaceList from "../screens/Admin/PlaceList";
 import PlaceGallery from "../screens/Admin/PlaceGallery";
 import NotificationList from "../screens/Admin/NotificationList";
 import CreateNotification from "../screens/Admin/CreateNotification";
 import AdminSettings from "../screens/Admin/AdminSettings";
 import WithdrawalList from "../screens/Admin/WithdrawalList";
-import PhotographerRequests from "../screens/Admin/PhotographerRequests";
 import AppointmentList from "../screens/Admin/AppointmentList";
+
 const Stack = createStackNavigator();
 
 export default function AdminStack() {
@@ -32,13 +35,61 @@ export default function AdminStack() {
         name="UserList"
         component={UserListScreen}
         options={{
-          headerShown: true,
+          headerShown: false,
           title: "Users",
         }}
       />
-      <Stack.Screen name="PlaceList" component={PlaceList} />
-      <Stack.Screen name="PlaceGallery" component={PlaceGallery} />
-      <Stack.Screen name="GuiderList" component={GuiderList} />
+
+      <Stack.Screen
+        name="GuiderList"
+        component={GuiderList}
+        options={{
+          headerShown: false,
+          title: "Guiders",
+        }}
+      />
+
+      <Stack.Screen
+        name="GuiderRequests"
+        component={GuiderRequests}
+        options={{
+          headerShown: false,
+          title: "Guider Requests",
+        }}
+      />
+
+      <Stack.Screen
+        name="PhotographerList"
+        component={PhotographerList}
+        options={{
+          headerShown: false,
+          title: "Photographers",
+        }}
+      />
+
+      <Stack.Screen
+        name="PhotographerRequests"
+        component={PhotographerRequests}
+        options={{
+          headerShown: false,
+          title: "Photographer Requests",
+        }}
+      />
+
+      <Stack.Screen 
+        name="PlaceList" 
+        component={PlaceList} 
+        options={{
+          headerShown: false,
+          title: "Places",
+        }}
+      />
+      
+      <Stack.Screen 
+        name="PlaceGallery" 
+        component={PlaceGallery} 
+      />
+      
       <Stack.Screen
         name="TransactionList"
         component={TransactionListScreen}
@@ -47,32 +98,52 @@ export default function AdminStack() {
           title: "Transactions",
         }}
       />
-      <Stack.Screen name="NotificationList" component={NotificationList} />
+      
+      <Stack.Screen 
+        name="NotificationList" 
+        component={NotificationList} 
+        options={{
+          headerShown: true,
+          title: "Notifications",
+        }}
+      />
+      
       <Stack.Screen
         name="CreateNotification"
         component={CreateNotification}
-        options={{ title: "Create Notification" }}
+        options={{ 
+          headerShown: true,
+          title: "Create Notification" 
+        }}
       />
+      
       <Stack.Screen
         name="AdminSettings"
         component={AdminSettings}
-        options={{ title: "Settings" }}
+        options={{ 
+          headerShown: true,
+          title: "Settings" 
+        }}
       />
+      
       <Stack.Screen
         name="WithdrawalList"
         component={WithdrawalList}
-        options={{ title: "Withdrawals" }}
+        options={{ 
+          headerShown: true,
+          title: "Withdrawals" 
+        }}
       />
+      
       <Stack.Screen
-        name="PhotographerRequests"
-        component={PhotographerRequests}
-        options={{ title: "Photographer Requests" }}
+        name="AppointmentList"
+        component={AppointmentList}
+        options={{ 
+          headerShown: true,
+          title: "Appointments" 
+        }}
       />
-      <Stack.Screen
-  name="AppointmentList"
-  component={AppointmentList}
-  options={{ title: "Appointments" }}
-/>
+
     </Stack.Navigator>
   );
 }

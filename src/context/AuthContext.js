@@ -10,12 +10,12 @@ const normalizeUser = (data) => {
 
   const base = data.user ? data.user : data;
 
-  const isAdmin = base.admin === true;
-  const isGuider = base.guider === true;
-  const isPhotographer = base.photographer === true;
+  // backend flags OR role string
+  const isAdmin = base.admin === true || base.role === "ADMIN";
+  const isGuider = base.guider === true || base.role === "GUIDER";
+  const isPhotographer = base.photographer === true || base.role === "PHOTOGRAPHER";
 
   return {
-    // basic info
     id: base.id,
     name: base.name || base.username || "User",
     username: base.username,
@@ -29,13 +29,13 @@ const normalizeUser = (data) => {
     longitude: base.longitude,
     profile: base.profile,
 
-    // 🔥 backend flags (VERY IMPORTANT)
+    // flags
     admin: isAdmin,
     guider: isGuider,
     photographer: isPhotographer,
 
-    // 🔥 derived role
-    isAdmin: isAdmin,
+    // derived role
+    isAdmin,
     role: isAdmin
       ? "ADMIN"
       : isGuider
@@ -44,7 +44,6 @@ const normalizeUser = (data) => {
       ? "PHOTOGRAPHER"
       : "USER",
 
-    // tokens
     token: data.token || base.token,
     refreshToken: data.refreshToken,
   };
@@ -63,27 +62,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /* ✅ REFRESH PROFILE (OPTIONAL) */
+  /* ✅ REFRESH PROFILE */
   const refreshUser = async () => {
     try {
       const res = await api.post("/user/get_profile", {});
       if (res?.data?.status === true && res.data.data) {
-        setUser((prev) =>
-          normalizeUser({
-            ...prev,
-            ...res.data.data,
-          })
-        );
+        setUser(normalizeUser(res.data.data));
       }
     } catch {
       console.log("refreshUser skipped");
     }
   };
 
-  /* ✅ UPDATE PROFILE (LOCAL SAFE UPDATE) */
+  /* ✅ UPDATE PROFILE */
   const updateProfile = async (payload) => {
     const res = await api.post("/user/update_profile", payload);
-
     if (res?.data?.status === true) {
       setUser((prev) =>
         normalizeUser({
@@ -92,8 +85,17 @@ export const AuthProvider = ({ children }) => {
         })
       );
     }
-
     return res.data;
+  };
+
+  /* ✅ ROLE REQUEST */
+  const requestRole = async (requestedRole) => {
+    try {
+      const res = await api.post("/user/request_role", { role: requestedRole });
+      return res.data;
+    } catch (err) {
+      return { status: false, message: "Something went wrong" };
+    }
   };
 
   /* ✅ LOGOUT */
@@ -104,7 +106,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, refreshUser, updateProfile }}
+      value={{ user, login, logout, refreshUser, updateProfile, requestRole }}
     >
       {children}
     </AuthContext.Provider>

@@ -47,28 +47,28 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             {!IS_ADMIN_APP && (
-              <Stack.Screen name="Register" component={RegisterScreen} />
+              <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
             )}
           </>
-        ) : user.isAdmin === true || user.role === "ADMIN" ? (
-          /* 👑 ADMIN */
+        ) : IS_ADMIN_APP ? (
+          // 👑 Admin APK → always AdminStack
+          <Stack.Screen name="Admin" component={AdminStack} />
+        ) : user.role === "ADMIN" ? (
+          // 👑 User APK but role = ADMIN
           <Stack.Screen name="Admin" component={AdminStack} />
         ) : user.role === "GUIDER" ? (
-          /* 🧭 GUIDER */
+          // 🧭 Guider role
           <Stack.Screen name="GuiderDashboard" component={GuiderDashboard} />
         ) : user.role === "PHOTOGRAPHER" ? (
-          /* 📸 PHOTOGRAPHER */
+          // 📸 Photographer role
           <Stack.Screen
             name="PhotographerDashboard"
             component={PhotographerDashboard}
           />
         ) : (
+          // 👤 Normal User (can send role request)
           <>
-            {/* 🏠 USER DASHBOARD */}
-            <Stack.Screen
-              name="UserDashboard"
-              component={UserDashboard}
-            />
+            <Stack.Screen name="UserDashboard" component={UserDashboard} />
 
             {/* 👤 PROFILE */}
             <Stack.Screen name="UserMenu" component={UserMenuScreen} />
@@ -96,20 +96,14 @@ export default function AppNavigator() {
             <Stack.Screen name="ContactUs" component={ContactUsScreen} />
 
             {/* 📍 LOCATION FLOW */}
-            <Stack.Screen
-              name="LocationPicker"
-              component={LocationPicker}
-            />
+            <Stack.Screen name="LocationPicker" component={LocationPicker} />
             <Stack.Screen
               name="LocationSearch"
               component={LocationSearchScreen}
             />
-            <Stack.Screen
-              name="MapSelect"
-              component={MapSelectScreen}
-            />
+            <Stack.Screen name="MapSelect" component={MapSelectScreen} />
 
-            {/* 📸 PHOTOGRAPHERS LIST (DISTANCE WISE) */}
+            {/* 📸 PHOTOGRAPHERS LIST */}
             <Stack.Screen
               name="PhotographersList"
               component={PhotographersListScreen}

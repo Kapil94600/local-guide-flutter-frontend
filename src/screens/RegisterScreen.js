@@ -1,151 +1,149 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import api from "../api/apiClient";
 
 export default function RegisterScreen({ navigation }) {
-  const [name, setName] = useState("");        // ✅ Full Name
-  const [username, setUsername] = useState(""); // ✅ Username
-  const [countryCode, setCountryCode] = useState("+91"); // ✅ Default India
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("user");
 
-const handleRegister = async () => {
-  try {
-    // Step 1: Register user
-    const res = await api.post("/user/register", {
-      name,
-      username,
-      countryCode,
-      phone,
-      password,
-    });
-
-    if (res.data.status) {
-      const userId = res.data.data.id;
-
-      // Step 2: Role specific request
-      if (role === "guider") {
-        await api.post("/guider/request", {
-          userId,
-          firmName: name,
-          phone,
-          address: "Some address",
-          placeId: 1,
-          idProofType: "Aadhar",
-          // + required files (multipart)
-        });
-      } else if (role === "photographer") {
-        await api.post("/photographers/request", {
-          userId,
-          firmName: name,
-          phone,
-          address: "Some address",
-          placeId: 1,
-          idProofType: "Aadhar",
-          // + required files (multipart)
-        });
-      }
-
-      navigation.navigate("Login");
-    } else {
-      console.error("Register failed:", res.data.message);
+  const handleRegister = async () => {
+    if (!name || !username || !phone || !password) {
+      Alert.alert("Error", "All fields are required");
+      return;
     }
-  } catch (err) {
-    console.error("Register API Error:", err.response?.data || err.message);
-  }
-};
 
+    try {
+      const res = await api.post("/user/register", {
+        name,
+        username,
+        countryCode,
+        phone,
+        password,
+      });
 
-
-
-
-
-
-
-
-
+      if (res.data.status) {
+        Alert.alert("Success", "Registered successfully");
+        navigation.navigate("Login");
+      } else {
+        Alert.alert("Register Failed", res.data.message);
+      }
+    } catch (err) {
+      console.log("Register API Error:", err.response?.data || err.message);
+      Alert.alert("Error", "Something went wrong, try again");
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Register</Text>
+    <LinearGradient colors={["#446f94e3", "#42738fe3"]} style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Register</Text>
+          <Text style={styles.subTitle}>Create your account 👋</Text>
 
-      {/* Full Name */}
-      <TextInput
-        style={styles.input}
-        placeholder="Full Name"
-        value={name}
-        onChangeText={setName}
-      />
+          <TextInput
+            style={styles.input}
+            placeholder="Full Name"
+            placeholderTextColor="#999"
+            value={name}
+            onChangeText={setName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Username"
+            placeholderTextColor="#999"
+            value={username}
+            onChangeText={setUsername}
+          />
 
-      {/* Username */}
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        value={username}
-        onChangeText={setUsername}
-      />
+          <View style={styles.phoneRow}>
+            <TextInput
+              style={[styles.input, styles.countryCode]}
+              placeholder="+91"
+              value={countryCode}
+              onChangeText={setCountryCode}
+              maxLength={4}
+            />
+            <TextInput
+              style={[styles.input, styles.phoneInput]}
+              placeholder="Phone (10 digits)"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              maxLength={10}
+            />
+          </View>
 
-      {/* Phone with Country Code */}
-      <View style={styles.phoneRow}>
-        <TextInput
-          style={[styles.input, styles.countryCode]}
-          placeholder="+91"
-          value={countryCode}
-          onChangeText={setCountryCode}
-          maxLength={4}
-        />
-        <TextInput
-          style={[styles.input, styles.phoneInput]}
-          placeholder="Phone (10 digits)"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          maxLength={10} // ✅ restrict to 10 digits
-        />
-      </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
 
-      {/* Password */}
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+          <TouchableOpacity style={styles.button} onPress={handleRegister}>
+            <Text style={styles.buttonText}>Register</Text>
+          </TouchableOpacity>
 
-      {/* Role Selection */}
-      <Text style={styles.label}>Select Role:</Text>
-      <View style={styles.roleRow}>
-        <TouchableOpacity onPress={() => setRole("user")}>
-          <Text style={[styles.roleText, role === "user" && styles.selected]}>User</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setRole("guider")}>
-          <Text style={[styles.roleText, role === "guider" && styles.selected]}>Guider</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setRole("photographer")}>
-          <Text style={[styles.roleText, role === "photographer" && styles.selected]}>Photographer</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Register</Text>
-      </TouchableOpacity>
-    </View>
+          <TouchableOpacity
+            style={{ marginTop: 12 }}
+            onPress={() => navigation.navigate("Login")}
+          >
+            <Text style={styles.loginText}>Already have an account? Login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: "center" },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
-  input: { borderWidth: 1, borderColor: "#ccc", padding: 10, marginBottom: 10, borderRadius: 5 },
-  phoneRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  container: { flex: 1 },
+  scroll: { flexGrow: 1, justifyContent: "center", padding: 20 },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 25,
+    elevation: 10,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#42738fe3",
+    textAlign: "center",
+  },
+  subTitle: { fontSize: 14, color: "#696d6fe3", textAlign: "center", marginBottom: 20 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 15,
+    fontSize: 15,
+    backgroundColor: "#fafafa",
+    color: "#111",
+  },
+  phoneRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 15 },
   countryCode: { flex: 1, marginRight: 5 },
   phoneInput: { flex: 3 },
-  label: { fontSize: 16, marginBottom: 5 },
-  roleRow: { flexDirection: "row", justifyContent: "space-around", marginBottom: 20 },
-  roleText: { fontSize: 16, padding: 5 },
-  selected: { color: "blue", fontWeight: "bold" },
-  button: { backgroundColor: "blue", padding: 15, borderRadius: 5 },
-  buttonText: { color: "#fff", textAlign: "center", fontSize: 16 },
+  button: {
+    backgroundColor: "#42738fe3",
+    padding: 15,
+    borderRadius: 12,
+  },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "bold", textAlign: "center" },
+  loginText: { color: "#42738fe3", textAlign: "center", fontSize: 14 },
 });

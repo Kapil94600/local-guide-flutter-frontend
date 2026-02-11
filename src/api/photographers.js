@@ -1,7 +1,7 @@
 import api from "./api";
+import { API } from "./apis";
+
+export const getAllPhotographers = () => api.get(API.GET_ALL_PHOTOGRAPHERS);
 
 export const getPhotographersByPlace = (placeId) =>
-  api.get(`/photographers/get_by_place?placeId=${placeId}`);
-
-export const getAllPhotographers = () =>
-  api.get("/photographers/get_all");
+  api.get(`${API.GET_PHOTOGRAPHERS_BY_PLACE}?placeId=${placeId}`);

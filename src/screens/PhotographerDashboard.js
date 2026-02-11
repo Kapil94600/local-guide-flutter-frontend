@@ -1,55 +1,52 @@
-import React, { useEffect, useState, useContext } from "react";
-import { View, Text, FlatList, StyleSheet } from "react-native";
-import api from "../api/apiClient";
-import { AuthContext } from "../context/AuthContext";
+import React, { useState } from "react";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
+import ProfileCard from "../components/ProfileCard";
+import StatsCard from "../components/StatsCard";
+import ServiceCard from "../components/ServiceCard";
 
 export default function PhotographerDashboard() {
-  const { user } = useContext(AuthContext);
-  const [appointments, setAppointments] = useState([]);
+  const [profile, setProfile] = useState({
+    firmName: "Kapil Photography",
+    rating: 4.6,
+    approvalStatus: "APPROVED",
+    active: true,
+    image: "https://i.pravatar.cc/150",
+  });
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const res = await api.post("/appointment/get_all", {
-          photographerId: user?.pId, // ✅ backend expects photographerId
-        });
-
-        if (res.data.status) {
-          setAppointments(res.data.data);
-        } else {
-          console.error("Failed:", res.data.message);
-        }
-      } catch (err) {
-        console.error("Error fetching appointments:", err.response?.data || err.message);
-      }
-    };
-
-    fetchAppointments();
-  }, []);
+  const services = [
+    { id: 1, title: "Wedding Shoot", description: "Full day shoot", price: 15000 },
+    { id: 2, title: "Pre Wedding", description: "Outdoor shoot", price: 8000 },
+  ];
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>📸 Photographer Dashboard</Text>
-
-      <FlatList
-        data={appointments}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.text}>Service: {item.serviceName}</Text>
-            <Text style={styles.text}>Date: {item.date}</Text>
-            <Text style={styles.text}>Customer: {item.customerName}</Text>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.text}>No appointments found</Text>}
+    <ScrollView style={styles.container}>
+      <ProfileCard
+        profile={profile}
+        onToggle={() =>
+          setProfile({ ...profile, active: !profile.active })
+        }
       />
-    </View>
+
+      <View style={styles.row}>
+        <StatsCard title="Today" value="2500" />
+        <StatsCard title="Month" value="42000" />
+        <StatsCard title="Total" value="1,85,000" />
+      </View>
+
+      <Text style={styles.heading}>Services</Text>
+      {services.map((item) => (
+        <ServiceCard key={item.id} service={item} />
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#f9f9f9" },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
-  card: { backgroundColor: "#fff", padding: 15, marginBottom: 10, borderRadius: 8, elevation: 2 },
-  text: { fontSize: 16, marginBottom: 5 },
+  container: { padding: 15, backgroundColor: "#F9FAFB" },
+  row: { flexDirection: "row", marginBottom: 20 },
+  heading: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
 });

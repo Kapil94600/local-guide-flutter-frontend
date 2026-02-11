@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Image,
+    Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthContext } from "../context/AuthContext";
@@ -15,6 +16,7 @@ const BASE_URL = "https://YOUR_BASE_URL";
 export default function UserMenuOverlay({ onClose, onNavigate }) {
     const { user, refreshUser, logout } = useContext(AuthContext);
     const [balance, setBalance] = useState(user?.balance ?? 0);
+    const [roleModalVisible, setRoleModalVisible] = useState(false);
 
     useEffect(() => {
         refreshUser && refreshUser();
@@ -41,20 +43,17 @@ export default function UserMenuOverlay({ onClose, onNavigate }) {
         <View style={styles.overlay}>
             {/* 🔵 PROFILE HEADER */}
             <View style={styles.profileHeader}>
-                {/* 🔙 BACK */}
                 <TouchableOpacity style={styles.backBtn} onPress={onClose}>
                     <Ionicons name="arrow-back" size={28} color="#fff" />
                 </TouchableOpacity>
 
-                {/* 👤 AVATAR → PROFILE PICTURE UPDATE */}
                 <TouchableOpacity
                     style={styles.avatarCircle}
                     onPress={() => {
                         onClose();
-                        onNavigate("UserProfile"); // 🔥 ONLY THIS
+                        onNavigate("UserProfile");
                     }}
                 >
-
                     {profileImage ? (
                         <Image source={{ uri: profileImage }} style={styles.avatarImg} />
                     ) : (
@@ -62,7 +61,6 @@ export default function UserMenuOverlay({ onClose, onNavigate }) {
                     )}
                 </TouchableOpacity>
 
-                {/* 👤 NAME / EMAIL → PROFILE UPDATE */}
                 <TouchableOpacity
                     onPress={() => {
                         onClose();
@@ -84,7 +82,6 @@ export default function UserMenuOverlay({ onClose, onNavigate }) {
             <View style={styles.menuBox}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     <MenuItem icon="person-outline" label="Edit Profile" onPress={() => onNavigate("ProfileUpdate")} />
-
                     <MenuItem icon="home-outline" label="Home" onPress={() => onNavigate("Home")} />
                     <MenuItem icon="wallet-outline" label="Add Balance" onPress={() => onNavigate("AddBalance")} />
                     <MenuItem icon="receipt-outline" label="Transaction History" onPress={() => onNavigate("TransactionHistory")} />
@@ -97,7 +94,13 @@ export default function UserMenuOverlay({ onClose, onNavigate }) {
                     <View style={styles.divider} />
                     <Text style={styles.sectionTitle}>Other</Text>
 
-                    <MenuItem icon="briefcase-outline" label="Work with us" onPress={() => onNavigate("WorkWithUs")} />
+                    {/* 🔥 Work with Us → Role Selection Modal */}
+                    <MenuItem 
+                        icon="briefcase-outline" 
+                        label="Work with us" 
+                        onPress={() => setRoleModalVisible(true)} 
+                    />
+
                     <MenuItem icon="information-circle-outline" label="About us" onPress={() => onNavigate("AboutUs")} />
                     <MenuItem icon="call-outline" label="Contact us" onPress={() => onNavigate("ContactUs")} />
                     <MenuItem icon="shield-checkmark-outline" label="Privacy & Policy" onPress={() => onNavigate("PrivacyPolicy")} />
@@ -115,6 +118,51 @@ export default function UserMenuOverlay({ onClose, onNavigate }) {
                     />
                 </ScrollView>
             </View>
+
+            {/* Role Selection Modal */}
+            <Modal
+                visible={roleModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setRoleModalVisible(false)}
+            >
+                <View style={styles.roleModalOverlay}>
+                    <View style={styles.roleModalBox}>
+                        <Text style={styles.roleModalTitle}>Select Role</Text>
+
+                        <TouchableOpacity
+                            style={styles.roleOption}
+                            onPress={() => {
+                                setRoleModalVisible(false);
+                                onClose();
+                                onNavigate("GuiderRequestScreen"); // ✅ must be registered in navigator
+                            }}
+                        >
+                            <Ionicons name="people-outline" size={22} color="#10B981" />
+                            <Text style={styles.roleOptionText}>Guider</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.roleOption}
+                            onPress={() => {
+                                setRoleModalVisible(false);
+                                onClose();
+                                onNavigate("PhotographerRequestScreen"); // ✅ must be registered in navigator
+                            }}
+                        >
+                            <Ionicons name="camera-outline" size={22} color="#F59E0B" />
+                            <Text style={styles.roleOptionText}>Photographer</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.roleCancelBtn}
+                            onPress={() => setRoleModalVisible(false)}
+                        >
+                            <Text style={styles.roleCancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -129,11 +177,11 @@ function MenuItem({ icon, label, onPress, color = "#111" }) {
     );
 }
 
-/* 🎨 STYLES — SAME AS BEFORE (UNCHANGED) */
+/* 🎨 STYLES */
 const styles = StyleSheet.create({
     overlay: { position: "absolute", top: 0, left: -20, right: 137, zIndex: 999 },
     profileHeader: {
-        backgroundColor: "#2563EB",
+        backgroundColor: "#42738fe3",
         paddingVertical: 22,
         paddingHorizontal: 16,
         borderTopLeftRadius: 16,
@@ -162,4 +210,36 @@ const styles = StyleSheet.create({
     menuText: { marginLeft: 12, fontSize: 14, fontWeight: "600" },
     divider: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 8, marginHorizontal: 12 },
     sectionTitle: { fontSize: 13, fontWeight: "700", marginLeft: 16, marginVertical: 6, color: "#374151" },
+
+    /* Role Modal Styles */
+    roleModalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    roleModalBox: {
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        padding: 20,
+        width: 250,
+        alignItems: "center",
+    },
+    roleModalTitle: {
+        fontSize: 16,
+        fontWeight: "700",
+        marginBottom: 16,
+    },
+    roleOption: {
+        flexDirection: "row",
+
+        alignItems: "center",
+        paddingVertical: 12,
+    },
+    roleOptionText: {
+        marginLeft: 10,
+        fontSize: 15,
+        fontWeight: "600",
+    },
+
 });

@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
 
   header: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#446f94e3",
     paddingTop: 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   },
 
   btn: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#3a0250e3",
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",

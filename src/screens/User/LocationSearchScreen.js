@@ -26,7 +26,7 @@ export default function LocationSearchScreen({ navigation }) {
     <View style={{ flex: 1, backgroundColor: "#f4f6ff" }}>
       {/* Curved Header */}
    <LinearGradient
-  colors={["#6a11cb", "#2575fc"]}
+  colors={["#446f94e3", "#42738fe3/l"]}
   style={styles.header}
 >
   {/* Top Row: Back + Title */}

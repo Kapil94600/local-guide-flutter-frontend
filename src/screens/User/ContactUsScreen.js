@@ -50,7 +50,7 @@ export default function ContactUsScreen({ navigation }) {
 
       {/* 📞 PHONE */}
       <TouchableOpacity style={styles.card} onPress={handleCall}>
-        <Ionicons name="call-outline" size={28} color="#2563EB" />
+        <Ionicons name="call-outline" size={28} color="#446f94e3" />
         <View style={styles.textBox}>
           <Text style={styles.label}>Call Us</Text>
           <Text style={styles.value}>{PHONE_NUMBER}</Text>
@@ -59,7 +59,7 @@ export default function ContactUsScreen({ navigation }) {
 
       {/* 📧 EMAIL */}
       <TouchableOpacity style={styles.card} onPress={handleEmail}>
-        <Ionicons name="mail-outline" size={28} color="#2563EB" />
+        <Ionicons name="mail-outline" size={28} color="#446f94e3"/>
         <View style={styles.textBox}>
           <Text style={styles.label}>Email Us</Text>
           <Text style={styles.value}>{EMAIL}</Text>
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#446f94e3",
     paddingTop: 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
