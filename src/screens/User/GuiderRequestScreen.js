@@ -11,12 +11,16 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
+  Modal,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthContext } from "../../context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
+const { width, height } = Dimensions.get("window");
 const BASE_URL = "http://31.97.227.108:8081";
 
 // ✅ FIXED: Allowed ID proof types from backend - matches allowedGovtIdTypes
@@ -32,6 +36,8 @@ export default function GuiderRequestScreen({ navigation }) {
   const { user, logout } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     const getTokenFromStorage = async () => {
@@ -54,14 +60,14 @@ export default function GuiderRequestScreen({ navigation }) {
     idProofFront: null,
     idProofBack: null,
     photograph: null,
-    idProofType: "Aadhaar", // ✅ Default matches backend
+    idProofType: "Aadhaar",
     description: "",
     phone: user?.phone || "",
     email: user?.email || "",
     placeId: "",
     places: "",
     address: "",
-    services: [], // ✅ Start with empty array, add via button
+    services: [],
   });
 
   // ✅ Add service function
@@ -97,15 +103,7 @@ export default function GuiderRequestScreen({ navigation }) {
     });
   };
 
-  // ✅ Helper to always return correct download URL
-  const getImageUrl = (path) => {
-    if (!path) return null;
-    if (typeof path === 'string' && path.includes("/api/image/download/")) return path;
-    if (path.uri) return path.uri;
-    return `${BASE_URL}/api/image/download/${path}`;
-  };
-
-  // ✅ Image picker - matches backend field names
+  // ✅ Image picker
   const pickImage = async (field) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -127,7 +125,6 @@ export default function GuiderRequestScreen({ navigation }) {
           name: `${field}_${Date.now()}.jpg`,
         };
         setForm(prev => ({ ...prev, [field]: imageData }));
-        console.log(`✅ ${field} image selected`);
       }
     } catch (error) {
       console.error("Image picker error:", error);
@@ -157,7 +154,6 @@ export default function GuiderRequestScreen({ navigation }) {
           name: `service_${Date.now()}_${index}.jpg`,
         };
         updateServiceField(index, 'image', imageData);
-        console.log(`✅ Service ${index + 1} image selected`);
       }
     } catch (error) {
       console.error("Service image picker error:", error);
@@ -165,11 +161,10 @@ export default function GuiderRequestScreen({ navigation }) {
     }
   };
 
-  // ✅ Create FormData - EXACT match with backend expectations
+  // ✅ Create FormData
   const createFormData = () => {
     const formData = new FormData();
     
-    // ✅ Required fields - match backend @RequestParam names exactly
     const fields = {
       userId: form.userId,
       firmName: form.firmName,
@@ -182,12 +177,10 @@ export default function GuiderRequestScreen({ navigation }) {
       address: form.address,
     };
 
-    // Append text fields
     Object.entries(fields).forEach(([key, value]) => {
       if (value) formData.append(key, value);
     });
 
-    // ✅ Helper to append file
     const addFile = (fieldName, file) => {
       if (file && file.uri) {
         const filename = file.uri.split('/').pop();
@@ -199,13 +192,11 @@ export default function GuiderRequestScreen({ navigation }) {
       }
     };
 
-    // ✅ Required files (backend requires these)
     addFile("featuredImage", form.featuredImage);
     addFile("idProofFront", form.idProofFront);
     addFile("idProofBack", form.idProofBack);
     addFile("photograph", form.photograph);
 
-    // ✅ Services array - matches backend parsing
     form.services.forEach((service, idx) => {
       formData.append(`services[${idx}][title]`, service.title || "");
       formData.append(`services[${idx}][description]`, service.description || "");
@@ -218,7 +209,7 @@ export default function GuiderRequestScreen({ navigation }) {
     return formData;
   };
 
-  // ✅ Validation - matches backend requirements
+  // ✅ Validation
   const validateForm = () => {
     if (!form.userId) {
       Alert.alert("Error", "User ID is required");
@@ -265,7 +256,6 @@ export default function GuiderRequestScreen({ navigation }) {
       return false;
     }
 
-    // Validate each service
     for (let i = 0; i < form.services.length; i++) {
       const service = form.services[i];
       if (!service.title.trim()) {
@@ -285,7 +275,7 @@ export default function GuiderRequestScreen({ navigation }) {
     return true;
   };
 
-  // ✅ Submit handler - matches backend endpoint
+  // ✅ Submit handler
   const handleSubmit = async () => {
     if (!token) {
       Alert.alert("Login Required", "Please login first to submit request.");
@@ -300,7 +290,6 @@ export default function GuiderRequestScreen({ navigation }) {
       setLoading(true);
       const formData = createFormData();
 
-      // ✅ CORRECT ENDPOINT - matches backend controller
       const response = await fetch(`${BASE_URL}/api/guider/request`, {
         method: 'POST',
         headers: {
@@ -318,18 +307,12 @@ export default function GuiderRequestScreen({ navigation }) {
         responseData = {};
       }
 
-      console.log("📥 Response:", response.status, responseData);
-
       if (response.ok && responseData.status === true) {
-        Alert.alert(
-          "Success! 🎉",
-          "Your guider application has been submitted successfully. You will be notified within 24-48 hours.",
-          [{ text: "OK", onPress: () => navigation.goBack() }]
-        );
+        setShowSuccessModal(true);
       } else {
         Alert.alert(
           "Submission Failed",
-          responseData.message || "Unable to process your request. Please check all required fields."
+          responseData.message || "Unable to process your request."
         );
       }
     } catch (error) {
@@ -340,571 +323,1213 @@ export default function GuiderRequestScreen({ navigation }) {
     }
   };
 
+  // ✅ Step Navigation
+  const nextStep = () => {
+    if (currentStep === 1) {
+      if (!form.firmName || !form.phone || !form.address) {
+        Alert.alert("Error", "Please fill all required fields");
+        return;
+      }
+    }
+    if (currentStep === 2) {
+      if (!form.idProofFront || !form.idProofBack || !form.photograph) {
+        Alert.alert("Error", "Please upload all required documents");
+        return;
+      }
+    }
+    setCurrentStep(prev => Math.min(prev + 1, 4));
+  };
+
+  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+
+  // ✅ Render step indicator
+  const renderStepIndicator = () => (
+    <View style={styles.stepContainer}>
+      {[1, 2, 3, 4].map((step) => (
+        <React.Fragment key={step}>
+          <View style={styles.stepWrapper}>
+            <View style={[
+              styles.stepCircle,
+              currentStep >= step && styles.stepCircleActive,
+              currentStep > step && styles.stepCircleCompleted
+            ]}>
+              {currentStep > step ? (
+                <Ionicons name="checkmark" size={16} color="#fff" />
+              ) : (
+                <Text style={[
+                  styles.stepText,
+                  currentStep >= step && styles.stepTextActive
+                ]}>{step}</Text>
+              )}
+            </View>
+            <Text style={[
+              styles.stepLabel,
+              currentStep >= step && styles.stepLabelActive
+            ]}>
+              {step === 1 ? "Basic" : step === 2 ? "Docs" : step === 3 ? "Services" : "Review"}
+            </Text>
+          </View>
+          {step < 4 && (
+            <View style={[
+              styles.stepLine,
+              currentStep > step && styles.stepLineActive
+            ]} />
+          )}
+        </React.Fragment>
+      ))}
+    </View>
+  );
+
   // ✅ Render image preview
   const renderImagePreview = (image, label, field, required = false) => (
     <TouchableOpacity style={styles.imageUploadBox} onPress={() => pickImage(field)}>
       {image ? (
         <View style={styles.imagePreview}>
           <Image source={{ uri: image.uri }} style={styles.previewImage} />
-          <View style={styles.imageInfo}>
-            <Text style={styles.imageName}>{label}{required ? ' *' : ''}</Text>
-            <Text style={styles.changeText}>✓ Selected</Text>
-          </View>
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.6)']}
+            style={styles.imageGradient}
+          >
+            <View style={styles.imageInfo}>
+              <Text style={styles.imageNameLight}>{label}{required ? ' *' : ''}</Text>
+              <View style={styles.imageCheck}>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                <Text style={styles.imageCheckText}>Uploaded</Text>
+              </View>
+            </View>
+          </LinearGradient>
         </View>
       ) : (
         <View style={styles.uploadPlaceholder}>
-          <Ionicons name="cloud-upload-outline" size={32} color="#94a3b8" />
+          <View style={styles.uploadIconContainer}>
+            <Ionicons name="cloud-upload-outline" size={32} color="#42738f" />
+          </View>
           <Text style={styles.uploadLabel}>{label}{required ? ' *' : ''}</Text>
-          <Text style={styles.uploadHint}>Tap to select</Text>
+          <Text style={styles.uploadHint}>Tap to upload</Text>
         </View>
       )}
     </TouchableOpacity>
   );
 
-  return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"} 
-      style={styles.container}
-    >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Become a Tourist Guide</Text>
-            <Text style={styles.subtitle}>Share your local knowledge with travelers</Text>
+  // ✅ Render service card
+  const renderServiceCard = (service, index) => (
+    <View key={index} style={styles.serviceCard}>
+      <View style={styles.serviceHeader}>
+        <View style={styles.serviceTitleContainer}>
+          <View style={styles.serviceNumberBadge}>
+            <Text style={styles.serviceNumberText}>{index + 1}</Text>
           </View>
+          <Text style={styles.serviceTitle}>Service Package</Text>
+        </View>
+        {form.services.length > 1 && (
+          <TouchableOpacity onPress={() => removeService(index)} style={styles.removeServiceBtn}>
+            <Ionicons name="close-circle" size={24} color="#EF4444" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.serviceInputGroup}>
+        <Ionicons name="pricetag-outline" size={18} color="#42738f" style={styles.inputIcon} />
+        <TextInput
+          style={styles.serviceInput}
+          placeholder="Service Title *"
+          placeholderTextColor="#94a3b8"
+          value={service.title}
+          onChangeText={(text) => updateServiceField(index, 'title', text)}
+        />
+      </View>
+
+      <View style={styles.serviceInputGroup}>
+        <Ionicons name="document-text-outline" size={18} color="#42738f" style={styles.inputIcon} />
+        <TextInput
+          style={[styles.serviceInput, styles.serviceTextArea]}
+          placeholder="Description *"
+          placeholderTextColor="#94a3b8"
+          value={service.description}
+          onChangeText={(text) => updateServiceField(index, 'description', text)}
+          multiline
+          numberOfLines={2}
+        />
+      </View>
+
+      <View style={styles.serviceRow}>
+        <View style={[styles.serviceInputGroup, { flex: 1, marginRight: 8 }]}>
+          <Ionicons name="cash-outline" size={18} color="#42738f" style={styles.inputIcon} />
+          <TextInput
+            style={styles.serviceInput}
+            placeholder="Price *"
+            placeholderTextColor="#94a3b8"
+            value={service.servicePrice}
+            onChangeText={(text) => updateServiceField(index, 'servicePrice', text)}
+            keyboardType="number-pad"
+          />
         </View>
 
-        <View style={styles.content}>
-          
-          {/* Basic Information */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>📋 Basic Information</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Firm/Company Name *"
-              placeholderTextColor="#94a3b8"
-              value={form.firmName}
-              onChangeText={(text) => setForm({...form, firmName: text})}
-            />
-            
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Description * (Tell tourists about yourself and your services)"
-              placeholderTextColor="#94a3b8"
-              value={form.description}
-              onChangeText={(text) => setForm({...form, description: text})}
-              multiline
-              numberOfLines={3}
-            />
-            
-            <View style={styles.row}>
-              <TextInput
-                style={[styles.input, { flex: 1, marginRight: 8 }]}
-                placeholder="Phone Number *"
-                placeholderTextColor="#94a3b8"
-                value={form.phone}
-                onChangeText={(text) => setForm({...form, phone: text})}
-                keyboardType="phone-pad"
-                maxLength={10}
-              />
-              
-              <TextInput
-                style={[styles.input, { flex: 1, marginLeft: 8 }]}
-                placeholder="Email Address"
-                placeholderTextColor="#94a3b8"
-                value={form.email}
-                onChangeText={(text) => setForm({...form, email: text})}
-                keyboardType="email-address"
-              />
+        <TouchableOpacity 
+          style={styles.serviceImageBtn}
+          onPress={() => handleServiceImageSelect(index)}
+        >
+          {service.image ? (
+            <View style={styles.serviceImageSelected}>
+              <Image source={{ uri: service.image.uri }} style={styles.serviceImageThumb} />
+              <View style={styles.serviceImageCheck}>
+                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+              </View>
             </View>
-            
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Full Address *"
-              placeholderTextColor="#94a3b8"
-              value={form.address}
-              onChangeText={(text) => setForm({...form, address: text})}
-              multiline
-              numberOfLines={2}
-            />
-          </View>
+          ) : (
+            <View style={styles.serviceImagePlaceholder}>
+              <Ionicons name="image-outline" size={18} color="#94a3b8" />
+              <Text style={styles.serviceImagePlaceholderText}>Image</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
-          {/* Place Information */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>📍 Service Areas</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Primary Place ID * (e.g., 1,2,3...)"
-              placeholderTextColor="#94a3b8"
-              value={form.placeId}
-              onChangeText={(text) => setForm({...form, placeId: text})}
-              keyboardType="number-pad"
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Other Places * (comma separated IDs, e.g., 2,4,6)"
-              placeholderTextColor="#94a3b8"
-              value={form.places}
-              onChangeText={(text) => setForm({...form, places: text})}
-            />
-            
-            <Text style={styles.hintText}>
-              💡 You can serve in multiple areas. Enter place IDs separated by commas.
-            </Text>
-          </View>
-
-          {/* ID Proof */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🪪 ID Proof & Documents</Text>
-            
-            <Text style={styles.label}>ID Proof Type *</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              style={styles.idTypeScroll}
+  // ✅ Success Modal
+  const renderSuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowSuccessModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.successIconContainer}>
+            <LinearGradient
+              colors={['#10B981', '#059669']}
+              style={styles.successIcon}
             >
-              {ID_PROOF_TYPES.map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.idTypeBtn,
-                    form.idProofType === type && styles.idTypeBtnActive
-                  ]}
-                  onPress={() => setForm({...form, idProofType: type})}
-                >
-                  <Text style={[
-                    styles.idTypeText,
-                    form.idProofType === type && styles.idTypeTextActive
-                  ]}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              <Ionicons name="checkmark" size={40} color="#fff" />
+            </LinearGradient>
+          </View>
+          
+          <Text style={styles.successTitle}>Application Submitted!</Text>
+          <Text style={styles.successText}>
+            Your guider application has been submitted successfully. We'll review your documents and notify you within 24-48 hours.
+          </Text>
 
-            <View style={styles.docGrid}>
-              <View style={styles.docColumn}>
-                {renderImagePreview(form.idProofFront, "ID Proof Front", "idProofFront", true)}
-                {renderImagePreview(form.photograph, "Your Photograph", "photograph", true)}
-              </View>
-              <View style={styles.docColumn}>
-                {renderImagePreview(form.idProofBack, "ID Proof Back", "idProofBack", true)}
-                {renderImagePreview(form.featuredImage, "Featured Image", "featuredImage", false)}
-              </View>
+          <View style={styles.successFeatures}>
+            <View style={styles.successFeature}>
+              <Ionicons name="time-outline" size={20} color="#10B981" />
+              <Text style={styles.successFeatureText}>Review in 24-48 hours</Text>
             </View>
-            
-            <Text style={styles.hintText}>
-              ⚠️ Upload clear, readable images of your documents
-            </Text>
+            <View style={styles.successFeature}>
+              <Ionicons name="notifications-outline" size={20} color="#10B981" />
+              <Text style={styles.successFeatureText}>Get notified on approval</Text>
+            </View>
+            <View style={styles.successFeature}>
+              <Ionicons name="shield-checkmark-outline" size={20} color="#10B981" />
+              <Text style={styles.successFeatureText}>Start earning as a guide</Text>
+            </View>
           </View>
 
-          {/* Services - Required by backend */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>📸 Your Services *</Text>
-              <TouchableOpacity onPress={addService} style={styles.addBtn}>
-                <Ionicons name="add-circle" size={22} color="#42738f" />
-                <Text style={styles.addBtnText}>Add Service</Text>
-              </TouchableOpacity>
-            </View>
+          <TouchableOpacity
+            style={styles.successBtn}
+            onPress={() => {
+              setShowSuccessModal(false);
+              navigation.goBack();
+            }}
+          >
+            <LinearGradient
+              colors={['#42738f', '#2c5a73']}
+              style={styles.successBtnGradient}
+            >
+              <Text style={styles.successBtnText}>Got it, Thanks!</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
-            {form.services.length === 0 ? (
-              <View style={styles.emptyServices}>
-                <Ionicons name="alert-circle-outline" size={40} color="#94a3b8" />
-                <Text style={styles.emptyServicesText}>
-                  Add at least one service to continue
-                </Text>
+  return (
+    <View style={styles.container}>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#1e3c4f', '#2c5a73', '#3b7a8f']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Become a Guide</Text>
+          <Text style={styles.subtitle}>Share your local knowledge</Text>
+        </View>
+      </LinearGradient>
+
+      {/* Step Indicator */}
+      {renderStepIndicator()}
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={100}
+      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Step 1: Basic Information */}
+          {currentStep === 1 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepCardTitle}>Basic Information</Text>
+              <Text style={styles.stepCardSubtitle}>Tell us about yourself</Text>
+
+              <View style={styles.inputGroup}>
+                <Ionicons name="business-outline" size={20} color="#42738f" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Firm/Company Name *"
+                  placeholderTextColor="#94a3b8"
+                  value={form.firmName}
+                  onChangeText={(text) => setForm({...form, firmName: text})}
+                />
               </View>
-            ) : (
-              form.services.map((service, idx) => (
-                <View key={idx} style={styles.serviceCard}>
-                  <View style={styles.serviceHeader}>
-                    <Text style={styles.serviceNumber}>Service {idx + 1}</Text>
-                    {form.services.length > 1 && (
-                      <TouchableOpacity onPress={() => removeService(idx)}>
-                        <Ionicons name="close-circle" size={20} color="#EF4444" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  
+
+              <View style={styles.inputGroup}>
+                <Ionicons name="document-text-outline" size={20} color="#42738f" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Description *"
+                  placeholderTextColor="#94a3b8"
+                  value={form.description}
+                  onChangeText={(text) => setForm({...form, description: text})}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Ionicons name="call-outline" size={20} color="#42738f" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Service Title * (e.g., Heritage Walk, City Tour)"
+                    placeholder="Phone *"
                     placeholderTextColor="#94a3b8"
-                    value={service.title}
-                    onChangeText={(text) => updateServiceField(idx, 'title', text)}
+                    value={form.phone}
+                    onChangeText={(text) => setForm({...form, phone: text})}
+                    keyboardType="phone-pad"
+                    maxLength={10}
                   />
-                  
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Description * (What's included in this tour?)"
-                    placeholderTextColor="#94a3b8"
-                    value={service.description}
-                    onChangeText={(text) => updateServiceField(idx, 'description', text)}
-                    multiline
-                    numberOfLines={3}
-                  />
-                  
+                </View>
+                
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Ionicons name="mail-outline" size={20} color="#42738f" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Price (₹) *"
+                    placeholder="Email"
                     placeholderTextColor="#94a3b8"
-                    value={service.servicePrice}
-                    onChangeText={(text) => updateServiceField(idx, 'servicePrice', text)}
+                    value={form.email}
+                    onChangeText={(text) => setForm({...form, email: text})}
+                    keyboardType="email-address"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Ionicons name="location-outline" size={20} color="#42738f" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Full Address *"
+                  placeholderTextColor="#94a3b8"
+                  value={form.address}
+                  onChangeText={(text) => setForm({...form, address: text})}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+
+              <View style={styles.locationRow}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Ionicons name="map-outline" size={20} color="#42738f" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Place ID *"
+                    placeholderTextColor="#94a3b8"
+                    value={form.placeId}
+                    onChangeText={(text) => setForm({...form, placeId: text})}
                     keyboardType="number-pad"
                   />
-                  
-                  <TouchableOpacity 
-                    style={styles.serviceImageBtn}
-                    onPress={() => handleServiceImageSelect(idx)}
+                </View>
+                
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Ionicons name="grid-outline" size={20} color="#42738f" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Other Places"
+                    placeholderTextColor="#94a3b8"
+                    value={form.places}
+                    onChangeText={(text) => setForm({...form, places: text})}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.hintText}>
+                <Ionicons name="information-circle" size={14} color="#64748b" /> Enter place IDs separated by commas
+              </Text>
+            </View>
+          )}
+
+          {/* Step 2: Documents */}
+          {currentStep === 2 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepCardTitle}>Identity Documents</Text>
+              <Text style={styles.stepCardSubtitle}>Upload your ID proofs</Text>
+
+              <Text style={styles.label}>ID Proof Type *</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.idTypeScroll}
+              >
+                {ID_PROOF_TYPES.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.idTypeChip,
+                      form.idProofType === type && styles.idTypeChipActive
+                    ]}
+                    onPress={() => setForm({...form, idProofType: type})}
                   >
-                    {service.image ? (
-                      <View style={styles.serviceImagePreview}>
-                        <Image source={{ uri: service.image.uri }} style={styles.servicePreviewImg} />
-                        <View style={styles.serviceImageInfo}>
-                          <Text style={styles.serviceImageText}>✓ Image selected</Text>
-                          <Text style={styles.changeImageText}>Tap to change</Text>
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={styles.serviceUploadPlaceholder}>
-                        <Ionicons name="image-outline" size={20} color="#94a3b8" />
-                        <Text style={styles.serviceImageText}>Add Service Image (Recommended)</Text>
-                      </View>
-                    )}
+                    <Text style={[
+                      styles.idTypeChipText,
+                      form.idProofType === type && styles.idTypeChipTextActive
+                    ]}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <View style={styles.documentsGrid}>
+                <View style={styles.docRow}>
+                  <View style={styles.docColumn}>
+                    {renderImagePreview(form.idProofFront, "ID Front", "idProofFront", true)}
+                  </View>
+                  <View style={styles.docColumn}>
+                    {renderImagePreview(form.idProofBack, "ID Back", "idProofBack", true)}
+                  </View>
+                </View>
+                <View style={styles.docRow}>
+                  <View style={styles.docColumn}>
+                    {renderImagePreview(form.photograph, "Your Photo", "photograph", true)}
+                  </View>
+                  <View style={styles.docColumn}>
+                    {renderImagePreview(form.featuredImage, "Featured", "featuredImage", false)}
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.hintText}>
+                <Ionicons name="alert-circle" size={14} color="#F59E0B" /> Upload clear, readable images
+              </Text>
+            </View>
+          )}
+
+          {/* Step 3: Services */}
+          {currentStep === 3 && (
+            <View style={styles.stepCard}>
+              <View style={styles.serviceHeaderRow}>
+                <View>
+                  <Text style={styles.stepCardTitle}>Your Services</Text>
+                  <Text style={styles.stepCardSubtitle}>Add your tour packages</Text>
+                </View>
+                <TouchableOpacity onPress={addService} style={styles.addServiceBtn}>
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.addServiceBtnText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+
+              {form.services.length === 0 ? (
+                <View style={styles.emptyServices}>
+                  <Ionicons name="cube-outline" size={48} color="#cbd5e1" />
+                  <Text style={styles.emptyServicesTitle}>No Services Added</Text>
+                  <Text style={styles.emptyServicesText}>
+                    Add at least one service package to continue
+                  </Text>
+                  <TouchableOpacity style={styles.emptyServicesBtn} onPress={addService}>
+                    <Text style={styles.emptyServicesBtnText}>Add First Service</Text>
                   </TouchableOpacity>
                 </View>
-              ))
+              ) : (
+                form.services.map((service, idx) => renderServiceCard(service, idx))
+              )}
+            </View>
+          )}
+
+          {/* Step 4: Review & Submit */}
+          {currentStep === 4 && (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepCardTitle}>Review Application</Text>
+              <Text style={styles.stepCardSubtitle}>Please review your information</Text>
+
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewSectionTitle}>Basic Information</Text>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>Firm Name</Text>
+                  <Text style={styles.reviewValue}>{form.firmName}</Text>
+                </View>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>Phone</Text>
+                  <Text style={styles.reviewValue}>{form.phone}</Text>
+                </View>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>Email</Text>
+                  <Text style={styles.reviewValue}>{form.email || 'Not provided'}</Text>
+                </View>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>Address</Text>
+                  <Text style={styles.reviewValue}>{form.address}</Text>
+                </View>
+              </View>
+
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewSectionTitle}>Documents</Text>
+                <View style={styles.reviewDocs}>
+                  <View style={styles.reviewDocItem}>
+                    <Ionicons name="document-text" size={20} color="#10B981" />
+                    <Text style={styles.reviewDocText}>ID Proof</Text>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  </View>
+                  <View style={styles.reviewDocItem}>
+                    <Ionicons name="camera" size={20} color="#10B981" />
+                    <Text style={styles.reviewDocText}>Photograph</Text>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewSectionTitle}>Services ({form.services.length})</Text>
+                {form.services.map((service, idx) => (
+                  <View key={idx} style={styles.reviewService}>
+                    <Text style={styles.reviewServiceTitle}>{service.title}</Text>
+                    <Text style={styles.reviewServicePrice}>₹{service.servicePrice}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.termsBox}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#42738f" />
+                <Text style={styles.termsText}>
+                  By submitting, you agree to our terms and confirm that all information is accurate
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Navigation Buttons */}
+          <View style={styles.navigationButtons}>
+            {currentStep > 1 && (
+              <TouchableOpacity style={styles.prevButton} onPress={prevStep}>
+                <Ionicons name="arrow-back" size={20} color="#64748b" />
+                <Text style={styles.prevButtonText}>Back</Text>
+              </TouchableOpacity>
             )}
             
-            <Text style={styles.hintText}>
-              💡 Keep prices competitive to get more bookings
-            </Text>
-          </View>
-
-          {/* Submit Button */}
-          <TouchableOpacity 
-            style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
+            {currentStep < 4 ? (
+              <TouchableOpacity 
+                style={[styles.nextButton, currentStep === 1 && styles.nextButtonFull]} 
+                onPress={nextStep}
+              >
+                <Text style={styles.nextButtonText}>Continue</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </TouchableOpacity>
             ) : (
-              <>
-                <Ionicons name="paper-plane-outline" size={20} color="#fff" />
-                <Text style={styles.submitText}>Submit Application</Text>
-              </>
+              <TouchableOpacity 
+                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                onPress={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="paper-plane" size={20} color="#fff" />
+                    <Text style={styles.submitButtonText}>Submit Application</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-
-          <View style={styles.noteBox}>
-            <Ionicons name="information-circle" size={16} color="#42738f" />
-            <Text style={styles.noteText}>
-              * Required fields. Your application will be reviewed within 24-48 hours. 
-              You'll receive a notification once approved.
-            </Text>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Success Modal */}
+      {renderSuccessModal()}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#f8fafc" 
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
   header: {
-    backgroundColor: "#42738f",
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   headerContent: {
     flex: 1,
-    marginLeft: 12,
   },
   title: {
     fontSize: 22,
-    fontWeight: "bold",
-    color: "#fff",
+    fontWeight: 'bold',
+    color: '#fff',
   },
   subtitle: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
   },
-  content: { 
-    padding: 16, 
-    paddingBottom: 40 
+  keyboardView: {
+    flex: 1,
   },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+  scrollContent: {
     padding: 16,
+    paddingBottom: 40,
+  },
+  
+  // Step Indicator
+  stepContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  stepWrapper: {
+    alignItems: 'center',
+  },
+  stepCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  stepCircleActive: {
+    backgroundColor: '#42738f',
+    borderColor: '#42738f',
+  },
+  stepCircleCompleted: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  stepText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  stepTextActive: {
+    color: '#fff',
+  },
+  stepLabel: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  stepLabelActive: {
+    color: '#42738f',
+    fontWeight: '500',
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#e2e8f0',
+    marginHorizontal: 4,
+  },
+  stepLineActive: {
+    backgroundColor: '#10B981',
+  },
+
+  // Step Cards
+  stepCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
   },
-  cardTitle: {
+  stepCardTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    color: "#1e293b",
-    marginBottom: 16,
+    fontWeight: '700',
+    color: '#1e293b',
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+  stepCardSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 20,
+  },
+
+  // Input Styles
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    marginBottom: 12,
+    paddingHorizontal: 12,
   },
   input: {
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    flex: 1,
+    paddingVertical: 14,
     fontSize: 14,
-    color: "#1e293b",
+    color: '#1e293b',
   },
   textArea: {
     minHeight: 80,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
+  },
+  inputIcon: {
+    marginRight: 10,
   },
   row: {
-    flexDirection: "row",
-  },
-  label: {
-    fontSize: 14,
-    color: "#475569",
+    flexDirection: 'row',
     marginBottom: 8,
-    fontWeight: "500",
+  },
+  locationRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
   },
   hintText: {
     fontSize: 12,
-    color: "#64748b",
-    marginTop: 8,
-    fontStyle: "italic",
+    color: '#64748b',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+
+  // Document Upload
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1e293b',
+    marginBottom: 8,
   },
   idTypeScroll: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginBottom: 16,
   },
-  idTypeBtn: {
+  idTypeChip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 20,
-    marginRight: 8,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 25,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  idTypeBtnActive: {
-    backgroundColor: "#42738f",
+  idTypeChipActive: {
+    backgroundColor: '#42738f',
+    borderColor: '#42738f',
   },
-  idTypeText: {
+  idTypeChipText: {
     fontSize: 13,
-    color: "#475569",
-    fontWeight: "500",
+    color: '#475569',
+    fontWeight: '500',
   },
-  idTypeTextActive: {
-    color: "#fff",
+  idTypeChipTextActive: {
+    color: '#fff',
   },
-  docGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  documentsGrid: {
+    marginTop: 8,
   },
-  docColumn: {
-    width: "48%",
-  },
-  imageUploadBox: {
+  docRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  uploadPlaceholder: {
-    height: 110,
-    backgroundColor: "#f8fafc",
-    borderWidth: 2,
-    borderColor: "#e2e8f0",
-    borderStyle: "dashed",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 12,
+  docColumn: {
+    width: '48%',
   },
-  uploadLabel: {
-    fontSize: 13,
-    color: "#475569",
-    fontWeight: "500",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  uploadHint: {
-    fontSize: 11,
-    color: "#94a3b8",
-    marginTop: 2,
-    textAlign: "center",
+  imageUploadBox: {
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   imagePreview: {
     height: 110,
-    backgroundColor: "#f8fafc",
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    position: 'relative',
   },
   previewImage: {
-    width: "100%",
-    height: 70,
-    resizeMode: "cover",
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
-  imageInfo: {
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 8,
   },
-  imageName: {
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: "500",
+  imageInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  changeText: {
+  imageNameLight: {
     fontSize: 11,
-    color: "#10B981",
-    marginTop: 2,
+    color: '#fff',
+    fontWeight: '500',
   },
-  addBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+  imageCheck: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  addBtnText: {
-    color: "#42738f",
-    fontSize: 14,
-    marginLeft: 4,
-    fontWeight: "500",
+  imageCheckText: {
+    fontSize: 9,
+    color: '#10B981',
+    fontWeight: '600',
+    marginLeft: 2,
   },
-  emptyServices: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 32,
-    backgroundColor: "#f8fafc",
-    borderRadius: 8,
-  },
-  emptyServicesText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: "#64748b",
-  },
-  serviceCard: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  serviceHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  serviceNumber: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1e293b",
-  },
-  serviceImageBtn: {
-    marginTop: 8,
-  },
-  serviceImagePreview: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  servicePreviewImg: {
-    width: 50,
-    height: 50,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  serviceImageInfo: {
-    flex: 1,
-  },
-  serviceImageText: {
-    color: "#10B981",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  changeImageText: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  serviceUploadPlaceholder: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderStyle: "dashed",
-  },
-  submitBtn: {
-    backgroundColor: "#42738f",
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
+  uploadPlaceholder: {
+    height: 110,
+    backgroundColor: '#f8fafc',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
     borderRadius: 12,
-    marginTop: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+  },
+  uploadIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e6f0f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  uploadLabel: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  uploadHint: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+
+  // Services
+  serviceHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  submitBtnDisabled: {
-    backgroundColor: "#94a3b8",
-    opacity: 0.7,
+  addServiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#42738f',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 25,
   },
-  submitText: {
-    color: "#fff",
+  addServiceBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  emptyServices: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+  },
+  emptyServicesTitle: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
+    color: '#1e293b',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyServicesText: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyServicesBtn: {
+    backgroundColor: '#42738f',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+  },
+  emptyServicesBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  serviceCard: {
+    marginBottom: 12,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  serviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  serviceTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  serviceNumberBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#42738f',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  serviceNumberText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  serviceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  removeServiceBtn: {
+    padding: 4,
+  },
+  serviceInputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  serviceInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#1e293b',
+  },
+  serviceTextArea: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  serviceImageBtn: {
+    width: 70,
+    height: 45,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  serviceImageSelected: {
+    flex: 1,
+    position: 'relative',
+  },
+  serviceImageThumb: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  serviceImageCheck: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+  },
+  serviceImagePlaceholder: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+  },
+  serviceImagePlaceholderText: {
+    fontSize: 9,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+
+  // Review Section
+  reviewSection: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+  },
+  reviewSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  reviewItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  reviewLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  reviewValue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1e293b',
+  },
+  reviewDocs: {
+    gap: 6,
+  },
+  reviewDocItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 8,
+  },
+  reviewDocText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#1e293b',
     marginLeft: 8,
   },
-  noteBox: {
-    flexDirection: "row",
-    backgroundColor: "#f1f5f9",
-    padding: 12,
+  reviewService: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    padding: 8,
     borderRadius: 8,
-    alignItems: "center",
+    marginBottom: 4,
+  },
+  reviewServiceTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1e293b',
+  },
+  reviewServicePrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#42738f',
+  },
+  termsBox: {
+    flexDirection: 'row',
+    backgroundColor: '#eff6ff',
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#1e293b',
+    lineHeight: 16,
+  },
+
+  // Navigation Buttons
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
     marginBottom: 20,
   },
-  noteText: {
-    color: "#64748b",
-    fontSize: 12,
-    marginLeft: 8,
+  prevButton: {
     flex: 1,
-    lineHeight: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  prevButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+    marginLeft: 6,
+  },
+  nextButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#42738f',
+    borderRadius: 12,
+  },
+  nextButtonFull: {
+    flex: 1,
+  },
+  nextButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginRight: 6,
+  },
+  submitButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 6,
+  },
+
+  // Success Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 340,
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  successIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  successText: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  successFeatures: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  successFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 10,
+  },
+  successFeatureText: {
+    fontSize: 12,
+    color: '#1e293b',
+    marginLeft: 10,
+  },
+  successBtn: {
+    width: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  successBtnGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  successBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

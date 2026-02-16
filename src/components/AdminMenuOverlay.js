@@ -78,21 +78,21 @@ export default function AdminMenuOverlay({ onClose, onNavigate }) {
                             label="All Users" 
                             onPress={() => {
                                 onClose();
-                                onNavigate("AdminAllUsers");
+                                onNavigate("UserList");
                             }}
                         />
                         <SubMenuItem 
                             label="Tour Guides" 
                             onPress={() => {
                                 onClose();
-                                onNavigate("AdminTourGuides");
+                                onNavigate("GuiderList");
                             }}
                         />
                         <SubMenuItem 
                             label="Photographers" 
                             onPress={() => {
                                 onClose();
-                                onNavigate("AdminPhotographers");
+                                onNavigate("PhotographerList");
                             }}
                         />
                         <SubMenuItem 

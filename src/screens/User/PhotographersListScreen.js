@@ -327,7 +327,7 @@ export default function PhotographersListScreen({ navigation, route }) {
       </View>
 
       <LinearGradient
-        colors={["#8B5CF6", "#7C3AED"]}
+        colors={["#56829a", "#2c5a73"]}
         style={styles.bookBadge}
       >
         <Text style={styles.bookBadgeText}>Book Now</Text>
@@ -448,7 +448,7 @@ export default function PhotographersListScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
                 <LinearGradient
-                  colors={["#8B5CF6", "#7C3AED"]}
+                 colors={["#56829a", "#2c5a73"]}
                   style={styles.applyGradient}
                 >
                   <Text style={styles.applyBtnText}>Apply Filters</Text>
@@ -540,7 +540,7 @@ export default function PhotographersListScreen({ navigation, route }) {
                 style={styles.dateSelector}
                 onPress={() => setShowDatePicker(true)}
               >
-                <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
+                <Ionicons name="calendar-outline" size={20} color="#2c5a73" />
                 <Text style={styles.dateText}>
                   {date.toLocaleDateString("en-IN", {
                     weekday: "short",
@@ -638,7 +638,7 @@ export default function PhotographersListScreen({ navigation, route }) {
                   disabled={bookingLoading || !selectedService}
                 >
                   <LinearGradient
-                    colors={["#8B5CF6", "#7C3AED"]}
+                    colors={["#56829a", "#2c5a73"]}
                     style={styles.confirmGradient}
                   >
                     {bookingLoading ? (
@@ -701,7 +701,7 @@ export default function PhotographersListScreen({ navigation, route }) {
       {/* Photographers List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
+          <ActivityIndicator size="large" color="#2c5a73" />
           <Text style={styles.loadingText}>Finding best photographers for you...</Text>
         </View>
       ) : (
@@ -719,7 +719,7 @@ export default function PhotographersListScreen({ navigation, route }) {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#8B5CF6" />
+                <ActivityIndicator size="small" color="#2c5a73" />
               </View>
             ) : null
           }
@@ -822,7 +822,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   imagePlaceholder: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -938,7 +938,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   resetFiltersBtn: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sortOptionSelected: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
   },
   sortOptionText: {
     fontSize: 13,
@@ -1017,7 +1017,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   ratingOptionSelected: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
   },
   ratingOptionText: {
     fontSize: 13,
@@ -1101,7 +1101,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   selectedServiceCard: {
-    borderColor: "#8B5CF6",
+    borderColor: "#2c5a73",
     backgroundColor: "#f3e8ff",
   },
   serviceImage: {
@@ -1133,7 +1133,7 @@ const styles = StyleSheet.create({
   servicePrice: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#8B5CF6",
+    color: "#2c5a73",
   },
   serviceDuration: {
     fontSize: 11,
@@ -1186,8 +1186,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   timeSlotSelected: {
-    backgroundColor: "#8B5CF6",
-    borderColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
+    borderColor: "#2c5a73",
   },
   timeSlotText: {
     fontSize: 12,
@@ -1250,7 +1250,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#8B5CF6",
+    color: "#2c5a73",
   },
   modalActions: {
     flexDirection: "row",

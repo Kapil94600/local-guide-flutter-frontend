@@ -18,8 +18,12 @@ import ProfilePictureScreen from "../screens/User/ProfilePictureScreen";
 import AddBalanceScreen from "../screens/User/AddBalanceScreen";
 import ContactUsScreen from "../screens/User/ContactUsScreen";
 import GuiderListScreen from "../screens/User/GuiderListScreen.js";
+import PlaceListScreen from "../screens/User/PlaceListScreen.js";
+import TopPlacesScreen from "../screens/User/TopPlacesScreen.js";
+import TopGuidersScreen from "../screens/User/TopGuidersScreen.js";
+import NotificationsScreen from "../screens/notifications/NotificationsScreen";
 
-
+// For admin
 
 /* 📍 LOCATION */
 import LocationPicker from "../screens/User/LocationPicker";
@@ -31,7 +35,8 @@ import PhotographersListScreen from "../screens/User/PhotographersListScreen";
 
 /* 🎭 ROLES - ADD THESE SCREENS */
 import RoleRequestScreen from "../screens/RoleRequestScreen";
-import GuiderRequestScreen from "../screens/User/GuiderRequestScreen"; // ✅ ADD THIS
+import GuiderRequestScreen from "../screens/User/GuiderRequestScreen";
+import PhotographerRequest from "../screens/User/PhotographerRequest";  // ✅ ADD THIS
 // import PhotographerRequestScreen from "../screens/User/PhotographerRequestScreen"; // ✅ ADD THIS
 import GuiderDashboard from "../screens/GuiderDashboard";
 import PhotographerDashboard from "../screens/PhotographerDashboard";
@@ -90,19 +95,39 @@ export default function AppNavigator() {
               name="ProfilePicture"
               component={ProfilePictureScreen}
             />
-              <Stack.Screen 
-      name="GuiderListScreen" 
-      component={GuiderListScreen} 
-   />
-
+            <Stack.Screen
+              name="GuiderListScreen"
+              component={GuiderListScreen}
+            />
+            <Stack.Screen
+              name="PhotographersListScreen"
+              component={PhotographersListScreen}
+            />
+            <Stack.Screen
+              name="PlaceListScreen"
+              component={PlaceListScreen}
+            />
+             <Stack.Screen
+              name="TopPlacesScreen"
+              component={TopPlacesScreen}
+            />
+              <Stack.Screen
+              name="TopGuidersScreen"
+              component={TopGuidersScreen}
+            />
             {/* 💰 WALLET */}
             <Stack.Screen name="AddBalance" component={AddBalanceScreen} />
 
             {/* 🎭 ROLE REQUEST - ADD THESE SCREENS */}
             <Stack.Screen name="RoleRequest" component={RoleRequestScreen} />
-            <Stack.Screen 
-              name="GuiderRequestScreen" 
-              component={GuiderRequestScreen} 
+            <Stack.Screen
+              name="GuiderRequestScreen"
+              component={GuiderRequestScreen}
+              options={{ title: "Become a Guider", headerShown: false }} // ✅ ADD THIS
+            />
+            <Stack.Screen
+              name="PhotographerRequest"
+              component={PhotographerRequest}
               options={{ title: "Become a Guider", headerShown: false }} // ✅ ADD THIS
             />
             {/* <Stack.Screen 
@@ -121,6 +146,7 @@ export default function AppNavigator() {
               component={LocationSearchScreen}
             />
             <Stack.Screen name="MapSelect" component={MapSelectScreen} />
+<Stack.Screen name="Notifications" component={NotificationsScreen} />
 
             {/* 📸 PHOTOGRAPHERS LIST */}
             {/* <Stack.Screen

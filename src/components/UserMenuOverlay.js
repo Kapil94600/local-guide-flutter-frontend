@@ -286,7 +286,7 @@ export default function UserMenuOverlay({ visible, onClose, onNavigate }) {
                             onPress={() => {
                                 setRoleModalVisible(false);
                                 onClose();
-                                onNavigate("GuiderRequest");
+                                onNavigate("GuiderRequestScreen");
                             }}
                         >
                             <View style={[styles.roleIcon, { backgroundColor: '#D1FAE5' }]}>
