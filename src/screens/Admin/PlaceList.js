@@ -15,54 +15,129 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import api from "../../api/apiClient";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
 
 const BASE_URL = "http://31.97.227.108:8081";
 
-// 🔥 FIXED IMAGE URL FUNCTION
-const getImageUrl = (path) => {
-  if (!path) {
-    console.log("🖼️ No image path provided");
-    return "https://via.placeholder.com/150";
+// 🔥 FIXED: Match Flutter's getImagesById method exactly
+const fetchImageById = async (imageId) => {
+  try {
+    console.log("🖼️ Fetching image with ID:", imageId);
+    
+    // Extract ID from filename (same as Flutter)
+    let id = imageId;
+    if (imageId.includes('/')) {
+      id = imageId.split('/').pop();
+    }
+    if (imageId.includes('\\')) {
+      id = imageId.split('\\').pop();
+    }
+    if (imageId.startsWith('image_')) {
+      // Extract just the number part
+      const match = imageId.match(/\d+/);
+      if (match) {
+        id = match[0];
+      }
+    }
+    
+    console.log("🖼️ Extracted ID:", id);
+    
+    // Call the same API endpoint as Flutter's getImagesById
+    const response = await api.post("/api/images/get_by_id", {
+      photographerId: null,
+      guiderId: null,
+      placeId: id,
+      imageId: id, // The image ID is passed as placeId in Flutter
+      page: 1
+    });
+    
+    console.log("🖼️ Image API response:", response.data);
+    
+    if (response.data?.status && response.data?.data?.length > 0) {
+      // Flutter expects an array of ImageDto
+      const imageDto = response.data.data[0];
+      if (imageDto?.url) {
+        return imageDto.url;
+      } else if (imageDto?.base64) {
+        return `data:image/jpeg;base64,${imageDto.base64}`;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("❌ Error fetching image:", error.message);
+    return null;
   }
-  
-  console.log("🖼️ Raw image path:", path);
-  
-  // If already full URL
-  if (path.startsWith("http")) {
-    console.log("🖼️ Already full URL:", path);
-    return path;
-  }
-  
-  // Try different patterns based on your backend
-  const cleanPath = path.replace(/^\/+/, "");
-  
-  // Pattern 1: Direct file in Uploads folder
-  const url1 = `${BASE_URL}/Uploads/${cleanPath}`;
-  console.log("🖼️ Trying URL 1:", url1);
-  
-  // Pattern 2: Direct file in root
-  const url2 = `${BASE_URL}/${cleanPath}`;
-  console.log("🖼️ Trying URL 2:", url2);
-  
-  // Pattern 3: With uploads lowercase
-  const url3 = `${BASE_URL}/uploads/${cleanPath}`;
-  
-  // Return the most likely one
-  return url1;
 };
 
-// Placeholder component for debugging
-const DebugImage = ({ source, style }) => {
+// 🔥 NEW: Image component that uses the same API as Flutter
+const ApiImage = ({ imagePath, style, placeId }) => {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  
-  const handleError = () => {
-    console.log("❌ Image failed to load:", source);
-    setError(true);
-  };
-  
-  if (error || !source?.uri) {
+
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId;
+
+    const loadImage = async () => {
+      if (!imagePath && !placeId) {
+        if (isMounted) {
+          setError(true);
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+      
+      // Use placeId if provided, otherwise extract from imagePath
+      const id = placeId || imagePath;
+      
+      // Try to fetch from API first (same as Flutter)
+      const url = await fetchImageById(id);
+      
+      if (isMounted) {
+        if (url) {
+          console.log("✅ Image URL fetched:", url);
+          setImageUrl(url);
+          setError(false);
+        } else {
+          console.log("❌ Failed to fetch image for:", id);
+          setError(true);
+        }
+        setLoading(false);
+      }
+    };
+
+    loadImage();
+
+    // Add timeout to prevent infinite loading
+    timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.log("⏰ Image loading timeout");
+        setError(true);
+        setLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [imagePath, placeId]);
+
+  if (loading) {
+    return (
+      <View style={[style, styles.imagePlaceholder]}>
+        <ActivityIndicator size="small" color="#42738f" />
+      </View>
+    );
+  }
+
+  if (error || !imageUrl) {
     return (
       <View style={[style, styles.imageError]}>
         <Icon name="image-off" size={24} color="#cbd5e1" />
@@ -70,12 +145,15 @@ const DebugImage = ({ source, style }) => {
       </View>
     );
   }
-  
+
   return (
     <Image
-      source={source}
+      source={{ uri: imageUrl }}
       style={style}
-      onError={handleError}
+      onError={() => {
+        console.log("❌ Image failed to load:", imageUrl);
+        setError(true);
+      }}
       resizeMode="cover"
     />
   );
@@ -86,8 +164,9 @@ export default function PlaceList({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Form states - same as before
+  // Form states
   const [placeName, setPlaceName] = useState("");
   const [description, setDescription] = useState("");
   const [state, setState] = useState("");
@@ -97,72 +176,94 @@ export default function PlaceList({ navigation }) {
   const [address, setAddress] = useState("");
   const [mapUrl, setMapUrl] = useState("");
   const [topPlace, setTopPlace] = useState(false);
-  const [openAllDay, setOpenAllDay] = useState(true);
-  const [timing, setTiming] = useState("");
   const [image, setImage] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     loadPlaces();
-    (async () => {
+    requestPermissions();
+  }, []);
+
+  const requestPermissions = async () => {
+    try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to upload images.');
       }
-    })();
-  }, []);
+    } catch (error) {
+      console.error("❌ Permission error:", error);
+    }
+  };
 
   const loadPlaces = async () => {
     try {
       setLoading(true);
       console.log("📡 Loading places...");
+      
       const res = await api.post("/places/get", { 
         page: 1, 
         perPage: 50 
       });
       
-      console.log("📍 API Response status:", res.data?.status);
-      console.log("📍 API Response message:", res.data?.message);
+      console.log("📍 Places API Response:", res.data);
       
       const placesData = res.data?.data || [];
       console.log(`📍 Places loaded: ${placesData.length}`);
       
-      // Debug: Check first place's image
-      if (placesData.length > 0) {
-        console.log("📍 First place data:", placesData[0]);
-        const firstPlace = placesData[0];
-        console.log("📍 First place image path:", firstPlace.featuredImage);
-        console.log("📍 Generated URL:", getImageUrl(firstPlace.featuredImage));
-      }
-      
       setPlaces(Array.isArray(placesData) ? placesData : []);
     } catch (e) {
-      console.error("❌ Error loading places:", e.response?.data || e.message);
+      console.error("❌ Error loading places:", e.message);
       Alert.alert("Error", "Failed to load places");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Test image URLs manually
-  const testImageUrls = () => {
-    console.log("🔍 Testing image URLs:");
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadPlaces();
+  };
+
+  // 🔥 TEST FUNCTION: Test the image API exactly like Flutter
+  const testImageApi = async () => {
+    if (places.length === 0) {
+      Alert.alert("No Places", "No places to test");
+      return;
+    }
+
+    console.log("\n🔍=== TESTING IMAGE API (Flutter Compatible) ===\n");
     
-    // Test the current places
-    places.forEach((place, index) => {
-      const url = getImageUrl(place.featuredImage);
-      console.log(`📷 Place ${index}: ${place.placeName}`);
-      console.log(`📷 Image path: ${place.featuredImage}`);
-      console.log(`📷 Generated URL: ${url}`);
+    for (let i = 0; i < Math.min(places.length, 3); i++) {
+      const place = places[i];
+      console.log(`Testing Place ID ${place.id}: ${place.placeName}`);
+      console.log(`Image path: ${place.featuredImage}`);
+      
+      try {
+        // Test the API exactly like Flutter's getImagesById
+        const response = await api.post("/api/images/get_by_id", {
+          photographerId: null,
+          guiderId: null,
+          placeId: place.id, // Use placeId, not the image filename
+          page: 1
+        });
+        
+        console.log(`API Response:`, response.data);
+        
+        if (response.data?.status && response.data?.data?.length > 0) {
+          console.log(`✅ Found ${response.data.data.length} images`);
+          console.log(`First image URL:`, response.data.data[0]?.url);
+        } else {
+          console.log(`❌ No images found for place ID: ${place.id}`);
+        }
+      } catch (error) {
+        console.log(`❌ API Error:`, error.message);
+      }
       console.log("---");
-    });
+    }
     
-    // Test direct access
-    Alert.alert(
-      "Test Image URLs",
-      `Checking ${places.length} places. Check console for details.`,
-      [{ text: "OK" }]
-    );
+    Alert.alert("Test Complete", "Check console for results");
   };
 
   const pickImage = async () => {
@@ -171,13 +272,16 @@ export default function PlaceList({ navigation }) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7,
+        base64: true, // Match Flutter's Uint8List
       });
 
       if (!result.canceled) {
         const selectedImage = result.assets[0];
         console.log("📸 Selected image:", selectedImage.uri);
+        
         setImage(selectedImage);
+        setImageBase64(selectedImage.base64);
         setImageError(false);
       }
     } catch (error) {
@@ -186,8 +290,9 @@ export default function PlaceList({ navigation }) {
     }
   };
 
-  // 🔥 FIXED SAVE FUNCTION - Test Version
+  // 🔥 FIXED: Match Flutter's addPlace method exactly
   const handleSavePlace = async () => {
+    // Validation
     if (!placeName.trim()) {
       Alert.alert("Error", "Place name is required");
       return;
@@ -212,7 +317,7 @@ export default function PlaceList({ navigation }) {
       Alert.alert("Error", "Valid longitude is required");
       return;
     }
-    if (!image) {
+    if (!image || !imageBase64) {
       setImageError(true);
       Alert.alert("Error", "Please select an image");
       return;
@@ -221,10 +326,9 @@ export default function PlaceList({ navigation }) {
     try {
       setSaving(true);
       
-      // Create FormData
       const formData = new FormData();
       
-      // Add text fields
+      // Add text fields - exactly like Flutter
       formData.append("placeName", placeName.trim());
       formData.append("description", description.trim());
       formData.append("state", state.trim());
@@ -234,18 +338,14 @@ export default function PlaceList({ navigation }) {
       formData.append("address", address.trim() || `${city}, ${state}, India`);
       formData.append("fullAddress", address.trim() || `${city}, ${state}, India`);
       
-      // Optional fields
       if (mapUrl.trim()) formData.append("mapUrl", mapUrl.trim());
       formData.append("topPlace", topPlace ? "true" : "false");
-      formData.append("openAllDay", openAllDay ? "true" : "false");
-      if (timing.trim()) formData.append("timing", timing.trim());
       
-      // Add image - IMPORTANT: Use correct field name
-      const imageUri = image.uri;
-      const imageName = `place_${Date.now()}.jpg`;
+      // Add image - exactly like Flutter's convertUint8ListToMultipart
+      const imageName = `image_${Date.now()}.jpg`;
       
       formData.append("featuredImage", {
-        uri: imageUri,
+        uri: image.uri,
         name: imageName,
         type: 'image/jpeg',
       });
@@ -254,10 +354,10 @@ export default function PlaceList({ navigation }) {
       console.log("Place Name:", placeName);
       console.log("Image Name:", imageName);
       
-      // Send request
       const response = await api.post("/places/add", formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json',
         },
       });
       
@@ -280,10 +380,7 @@ export default function PlaceList({ navigation }) {
       
     } catch (error) {
       console.error("❌ Save error:", error.response?.data || error.message);
-      Alert.alert(
-        "Error", 
-        error.response?.data?.message || "Failed to save place. Please try again."
-      );
+      Alert.alert("Error", "Failed to save place. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -299,9 +396,8 @@ export default function PlaceList({ navigation }) {
     setAddress("");
     setMapUrl("");
     setTopPlace(false);
-    setOpenAllDay(true);
-    setTiming("");
     setImage(null);
+    setImageBase64(null);
     setImageError(false);
   };
 
@@ -337,19 +433,17 @@ export default function PlaceList({ navigation }) {
   };
 
   const renderPlaceItem = ({ item }) => {
-    const imageUrl = getImageUrl(item.featuredImage);
-    console.log(`🖼️ Rendering place: ${item.placeName}`);
-    console.log(`🖼️ Image URL: ${imageUrl}`);
-    
     return (
       <TouchableOpacity 
         style={styles.card}
         onPress={() => navigation.navigate("PlaceDetails", { placeId: item.id })}
+        activeOpacity={0.7}
       >
         <View style={styles.cardContent}>
-          {/* Use DebugImage component */}
-          <DebugImage
-            source={{ uri: imageUrl }}
+          {/* Pass the place ID to fetch images */}
+          <ApiImage
+            imagePath={item.featuredImage}
+            placeId={item.id} // Pass placeId to fetch images
             style={styles.image}
           />
           
@@ -358,7 +452,7 @@ export default function PlaceList({ navigation }) {
               <Text style={styles.title} numberOfLines={1}>
                 {item.placeName || "Unnamed Place"}
               </Text>
-              {item.isTop && (
+              {item.topPlace && (
                 <View style={styles.topBadge}>
                   <Icon name="crown" size={12} color="#fff" />
                   <Text style={styles.topBadgeText}>Top</Text>
@@ -371,29 +465,10 @@ export default function PlaceList({ navigation }) {
             </Text>
             
             <View style={styles.locationRow}>
-              <Icon name="map-marker" size={14} color="#666" />
+              <Icon name="map-marker" size={14} color="#64748b" />
               <Text style={styles.locationText}>
                 {item.city || "Unknown City"}, {item.state || "Unknown State"}
               </Text>
-            </View>
-            
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Icon name="eye" size={12} color="#666" />
-                <Text style={styles.statText}>{item.views || 0} views</Text>
-              </View>
-              
-              <View style={styles.statItem}>
-                <Icon name="star" size={12} color="#F59E0B" />
-                <Text style={styles.statText}>{item.rating || 0} rating</Text>
-              </View>
-              
-              {item.openAllDay && (
-                <View style={styles.statItem}>
-                  <Icon name="clock-outline" size={12} color="#10B981" />
-                  <Text style={[styles.statText, styles.openText]}>24/7</Text>
-                </View>
-              )}
             </View>
             
             <View style={styles.actionRow}>
@@ -419,7 +494,200 @@ export default function PlaceList({ navigation }) {
     );
   };
 
-  if (loading) {
+  const renderModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={() => {
+        resetForm();
+        setModalVisible(false);
+      }}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalContainer}
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Add New Place</Text>
+            <TouchableOpacity
+              onPress={() => {
+                resetForm();
+                setModalVisible(false);
+              }}
+            >
+              <Icon name="close" size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <TouchableOpacity 
+              style={[
+                styles.imagePicker,
+                imageError && styles.imagePickerError
+              ]} 
+              onPress={pickImage}
+            >
+              {image ? (
+                <Image 
+                  source={{ uri: image.uri }} 
+                  style={styles.previewImage} 
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.imagePickerPlaceholder}>
+                  <Icon name="camera-plus" size={40} color="#94a3b8" />
+                  <Text style={styles.imagePickerText}>Select Image</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Place Name *</Text>
+              <TextInput
+                style={styles.input}
+                value={placeName}
+                onChangeText={setPlaceName}
+                placeholder="Enter place name"
+                placeholderTextColor="#94a3b8"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Description *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Enter description"
+                placeholderTextColor="#94a3b8"
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>State *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={state}
+                  onChangeText={setState}
+                  placeholder="Enter state"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
+
+              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>City *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={city}
+                  onChangeText={setCity}
+                  placeholder="Enter city"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>Latitude *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={latitude}
+                  onChangeText={setLatitude}
+                  placeholder="e.g., 27.1751"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>Longitude *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={longitude}
+                  onChangeText={setLongitude}
+                  placeholder="e.g., 78.0421"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Address</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Enter full address"
+                placeholderTextColor="#94a3b8"
+                multiline
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Map URL</Text>
+              <TextInput
+                style={styles.input}
+                value={mapUrl}
+                onChangeText={setMapUrl}
+                placeholder="Enter Google Maps URL"
+                placeholderTextColor="#94a3b8"
+              />
+            </View>
+
+            <View style={styles.toggleContainer}>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Top Place</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    topPlace && styles.toggleButtonActive
+                  ]}
+                  onPress={() => setTopPlace(!topPlace)}
+                >
+                  <View style={[
+                    styles.toggleDot,
+                    topPlace && styles.toggleDotActive
+                  ]} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  resetForm();
+                  setModalVisible(false);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                onPress={handleSavePlace}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Place</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#42738f" />
@@ -430,23 +698,23 @@ export default function PlaceList({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerTitle}>Tourist Places</Text>
             <Text style={styles.headerSubtitle}>{places.length} places found</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.testButton}
-            onPress={testImageUrls}
-          >
-            <Icon name="debug-step-over" size={20} color="#fff" />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.testButton}
+              onPress={testImageApi}
+            >
+              <Icon name="debug-step-over" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      {/* Places List */}
       {places.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Icon name="map-marker-off" size={64} color="#cbd5e1" />
@@ -469,12 +737,11 @@ export default function PlaceList({ navigation }) {
           renderItem={renderPlaceItem}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-          refreshing={loading}
-          onRefresh={loadPlaces}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       )}
 
-      {/* Add Place FAB */}
       {places.length > 0 && (
         <TouchableOpacity 
           style={styles.fab} 
@@ -484,8 +751,7 @@ export default function PlaceList({ navigation }) {
         </TouchableOpacity>
       )}
 
-      {/* Modal - same as before */}
-      {/* ... Modal code remains the same ... */}
+      {renderModal()}
     </View>
   );
 }
@@ -503,7 +769,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    color: "#64748b",
   },
   header: {
     paddingHorizontal: 20,
@@ -526,6 +792,10 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: "#64748b",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   testButton: {
     backgroundColor: "#8B5CF6",
@@ -592,6 +862,15 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
+  imagePlaceholder: {
+    width: 120,
+    height: 120,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+    backgroundColor: "#f1f5f9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   imageError: {
     width: 120,
     height: 120,
@@ -649,30 +928,13 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 12,
-    color: "#666",
+    color: "#64748b",
     marginLeft: 4,
-  },
-  statsRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  statText: {
-    fontSize: 11,
-    color: "#666",
-    marginLeft: 4,
-  },
-  openText: {
-    color: "#10B981",
-    fontWeight: "500",
   },
   actionRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    marginTop: 8,
   },
   editButton: {
     flexDirection: "row",
@@ -719,5 +981,151 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 6,
   },
-  // ... rest of the styles remain the same
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1e293b",
+  },
+  imagePicker: {
+    width: "100%",
+    height: 200,
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#e2e8f0",
+    borderStyle: "dashed",
+    marginBottom: 20,
+    overflow: "hidden",
+  },
+  imagePickerError: {
+    borderColor: "#EF4444",
+  },
+  imagePickerPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePickerText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#94a3b8",
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#1e293b",
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: "#1e293b",
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  row: {
+    flexDirection: "row",
+    marginBottom: 16,
+  },
+  toggleContainer: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: "#1e293b",
+  },
+  toggleButton: {
+    width: 44,
+    height: 24,
+    backgroundColor: "#e2e8f0",
+    borderRadius: 12,
+    padding: 2,
+  },
+  toggleButtonActive: {
+    backgroundColor: "#42738f",
+  },
+  toggleDot: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+  },
+  toggleDotActive: {
+    transform: [{ translateX: 20 }],
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#64748b",
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    marginLeft: 8,
+    backgroundColor: "#42738f",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
+  },
 });

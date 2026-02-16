@@ -1,19 +1,18 @@
-import React, { createContext, useState } from "react";
+import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../api/api";
 
 export const AuthContext = createContext();
 
-/* 🔥 SINGLE SOURCE OF TRUTH */
 const normalizeUser = (data) => {
   if (!data) return null;
 
   const base = data.user ? data.user : data;
 
-  // backend flags OR role string
   const isAdmin = base.admin === true || base.role === "ADMIN";
   const isGuider = base.guider === true || base.role === "GUIDER";
-  const isPhotographer = base.photographer === true || base.role === "PHOTOGRAPHER";
+  const isPhotographer =
+    base.photographer === true || base.role === "PHOTOGRAPHER";
 
   return {
     id: base.id,
@@ -29,12 +28,10 @@ const normalizeUser = (data) => {
     longitude: base.longitude,
     profile: base.profile,
 
-    // flags
     admin: isAdmin,
     guider: isGuider,
     photographer: isPhotographer,
 
-    // derived role
     isAdmin,
     role: isAdmin
       ? "ADMIN"
@@ -52,31 +49,51 @@ const normalizeUser = (data) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
+  /* 🔥 AUTO LOAD TOKEN ON APP START */
+  useEffect(() => {
+    const loadToken = async () => {
+      const token = await AsyncStorage.getItem("token");
+      if (token) {
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        refreshUser();
+      }
+    };
+    loadToken();
+  }, []);
+
   /* ✅ LOGIN */
   const login = async (loginResponse) => {
     const normalized = normalizeUser(loginResponse);
-    setUser(normalized);
 
     if (normalized?.token) {
       await AsyncStorage.setItem("token", normalized.token);
+
+      // 🔥 IMPORTANT FIX
+      api.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${normalized.token}`;
     }
+
+    setUser(normalized);
   };
 
   /* ✅ REFRESH PROFILE */
   const refreshUser = async () => {
     try {
-      const res = await api.post("/user/get_profile", {});
+      const res = await api.post("/user/get_profile");
+
       if (res?.data?.status === true && res.data.data) {
         setUser(normalizeUser(res.data.data));
       }
-    } catch {
-      console.log("refreshUser skipped");
+    } catch (err) {
+      console.log("refreshUser failed", err?.response?.status);
     }
   };
 
   /* ✅ UPDATE PROFILE */
   const updateProfile = async (payload) => {
     const res = await api.post("/user/update_profile", payload);
+
     if (res?.data?.status === true) {
       setUser((prev) =>
         normalizeUser({
@@ -85,13 +102,16 @@ export const AuthProvider = ({ children }) => {
         })
       );
     }
+
     return res.data;
   };
 
   /* ✅ ROLE REQUEST */
   const requestRole = async (requestedRole) => {
     try {
-      const res = await api.post("/user/request_role", { role: requestedRole });
+      const res = await api.post("/user/request_role", {
+        role: requestedRole,
+      });
       return res.data;
     } catch (err) {
       return { status: false, message: "Something went wrong" };
@@ -101,6 +121,7 @@ export const AuthProvider = ({ children }) => {
   /* ✅ LOGOUT */
   const logout = async () => {
     await AsyncStorage.removeItem("token");
+    delete api.defaults.headers.common["Authorization"];
     setUser(null);
   };
 

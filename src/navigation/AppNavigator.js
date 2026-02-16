@@ -17,6 +17,9 @@ import ProfileUpdateScreen from "../screens/User/ProfileUpdateScreen";
 import ProfilePictureScreen from "../screens/User/ProfilePictureScreen";
 import AddBalanceScreen from "../screens/User/AddBalanceScreen";
 import ContactUsScreen from "../screens/User/ContactUsScreen";
+import GuiderListScreen from "../screens/User/GuiderListScreen.js";
+
+
 
 /* 📍 LOCATION */
 import LocationPicker from "../screens/User/LocationPicker";
@@ -26,8 +29,10 @@ import MapSelectScreen from "../screens/User/MapSelectScreen";
 /* 📸 PHOTOGRAPHERS */
 import PhotographersListScreen from "../screens/User/PhotographersListScreen";
 
-/* 🎭 ROLES */
+/* 🎭 ROLES - ADD THESE SCREENS */
 import RoleRequestScreen from "../screens/RoleRequestScreen";
+import GuiderRequestScreen from "../screens/User/GuiderRequestScreen"; // ✅ ADD THIS
+// import PhotographerRequestScreen from "../screens/User/PhotographerRequestScreen"; // ✅ ADD THIS
 import GuiderDashboard from "../screens/GuiderDashboard";
 import PhotographerDashboard from "../screens/PhotographerDashboard";
 
@@ -85,12 +90,26 @@ export default function AppNavigator() {
               name="ProfilePicture"
               component={ProfilePictureScreen}
             />
+              <Stack.Screen 
+      name="GuiderListScreen" 
+      component={GuiderListScreen} 
+   />
 
             {/* 💰 WALLET */}
             <Stack.Screen name="AddBalance" component={AddBalanceScreen} />
 
-            {/* 🎭 ROLE REQUEST */}
+            {/* 🎭 ROLE REQUEST - ADD THESE SCREENS */}
             <Stack.Screen name="RoleRequest" component={RoleRequestScreen} />
+            <Stack.Screen 
+              name="GuiderRequestScreen" 
+              component={GuiderRequestScreen} 
+              options={{ title: "Become a Guider", headerShown: false }} // ✅ ADD THIS
+            />
+            {/* <Stack.Screen 
+              name="PhotographerRequestScreen" 
+              component={PhotographerRequestScreen} 
+              options={{ title: "Become a Photographer", headerShown: true }} // ✅ ADD THIS
+            /> */}
 
             {/* ☎️ CONTACT */}
             <Stack.Screen name="ContactUs" component={ContactUsScreen} />
@@ -104,10 +123,10 @@ export default function AppNavigator() {
             <Stack.Screen name="MapSelect" component={MapSelectScreen} />
 
             {/* 📸 PHOTOGRAPHERS LIST */}
-            <Stack.Screen
+            {/* <Stack.Screen
               name="PhotographersList"
               component={PhotographersListScreen}
-            />
+            /> */}
           </>
         )}
       </Stack.Navigator>

@@ -26,17 +26,17 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 const BASE_URL = "http://31.97.227.108:8081";
 
-export default function PhotographersListScreen({ navigation, route }) {
+export default function GuiderListScreen({ navigation, route }) {
   const { user } = useContext(AuthContext);
   const { location } = useContext(LocationContext);
   const { type } = route.params || { type: "all" };
 
-  const [photographers, setPhotographers] = useState([]);
-  const [filteredPhotographers, setFilteredPhotographers] = useState([]);
+  const [guiders, setGuiders] = useState([]);
+  const [filteredGuiders, setFilteredGuiders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPhotographer, setSelectedPhotographer] = useState(null);
+  const [selectedGuider, setSelectedGuider] = useState(null);
   const [bookingModal, setBookingModal] = useState(false);
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
@@ -44,7 +44,7 @@ export default function PhotographersListScreen({ navigation, route }) {
   const [filterModal, setFilterModal] = useState(false);
   const [sortBy, setSortBy] = useState("rating");
   const [minRating, setMinRating] = useState(0);
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 50000 });
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 });
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [timeSlot, setTimeSlot] = useState("");
@@ -53,42 +53,30 @@ export default function PhotographersListScreen({ navigation, route }) {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Photography specific time slots
-  const timeSlots = [
-    "08:00 AM - 10:00 AM",
-    "10:00 AM - 12:00 PM",
-    "12:00 PM - 02:00 PM",
-    "02:00 PM - 04:00 PM",
-    "04:00 PM - 06:00 PM",
-    "06:00 PM - 08:00 PM",
-    "08:00 PM - 10:00 PM",
-    "10:00 PM - 12:00 AM",
-  ];
-
   useEffect(() => {
-    fetchPhotographers();
+    fetchGuiders();
   }, [location, sortBy, minRating, priceRange]);
 
   useEffect(() => {
     if (searchQuery) {
-      const filtered = photographers.filter(
-        (photographer) =>
-          photographer.firmName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          photographer.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          photographer.placeName?.toLowerCase().includes(searchQuery.toLowerCase())
+      const filtered = guiders.filter(
+        (guider) =>
+          guider.firmName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          guider.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          guider.placeName?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredPhotographers(filtered);
+      setFilteredGuiders(filtered);
     } else {
-      setFilteredPhotographers(photographers);
+      setFilteredGuiders(guiders);
     }
-  }, [searchQuery, photographers]);
+  }, [searchQuery, guiders]);
 
-  const fetchPhotographers = async (pageNum = 1, append = false) => {
+  const fetchGuiders = async (pageNum = 1, append = false) => {
     try {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
 
-      const response = await api.post(API.GET_PHOTOGRAPHERS_ALL, {
+      const response = await api.post(API.GET_GUIDERS_ALL, {
         latitude: location?.latitude,
         longitude: location?.longitude,
         page: pageNum,
@@ -100,20 +88,20 @@ export default function PhotographersListScreen({ navigation, route }) {
       });
 
       if (response.data?.status) {
-        const newPhotographers = response.data.data || [];
+        const newGuiders = response.data.data || [];
         
         if (append) {
-          setPhotographers(prev => [...prev, ...newPhotographers]);
+          setGuiders(prev => [...prev, ...newGuiders]);
         } else {
-          setPhotographers(newPhotographers);
+          setGuiders(newGuiders);
         }
         
-        setHasMore(newPhotographers.length === 10);
+        setHasMore(newGuiders.length === 10);
         setPage(pageNum);
       }
     } catch (error) {
-      console.error("Error fetching photographers:", error);
-      Alert.alert("Error", "Failed to load photographers");
+      console.error("Error fetching guiders:", error);
+      Alert.alert("Error", "Failed to load guiders");
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -123,25 +111,25 @@ export default function PhotographersListScreen({ navigation, route }) {
 
   const loadMore = () => {
     if (hasMore && !loadingMore) {
-      fetchPhotographers(page + 1, true);
+      fetchGuiders(page + 1, true);
     }
   };
 
   const onRefresh = () => {
     setRefreshing(true);
     setPage(1);
-    fetchPhotographers(1, false);
+    fetchGuiders(1, false);
   };
 
-  const handlePhotographerPress = (photographer) => {
-    setSelectedPhotographer(photographer);
-    fetchPhotographerServices(photographer.id);
+  const handleGuiderPress = (guider) => {
+    setSelectedGuider(guider);
+    fetchGuiderServices(guider.id);
   };
 
-  const fetchPhotographerServices = async (photographerId) => {
+  const fetchGuiderServices = async (guiderId) => {
     try {
       const response = await api.post(API.GET_SERVICES, {
-        photographerId: photographerId,
+        guiderId: guiderId,
       });
       
       if (response.data?.status) {
@@ -160,7 +148,7 @@ export default function PhotographersListScreen({ navigation, route }) {
 
   const handleConfirmBooking = async () => {
     if (!selectedService) {
-      Alert.alert("Error", "Please select a service package");
+      Alert.alert("Error", "Please select a service");
       return;
     }
 
@@ -180,7 +168,7 @@ export default function PhotographersListScreen({ navigation, route }) {
 
       const bookingData = {
         userId: user.id,
-        photographerId: selectedPhotographer.id,
+        guiderId: selectedGuider.id,
         serviceId: selectedService.id,
         appointmentDate: date.toISOString().split('T')[0],
         timeSlot: timeSlot,
@@ -194,7 +182,7 @@ export default function PhotographersListScreen({ navigation, route }) {
       if (response.data?.status) {
         Alert.alert(
           "Success",
-          "Booking request sent successfully! The photographer will respond shortly.",
+          "Booking request sent successfully! The guide will respond shortly.",
           [
             {
               text: "OK",
@@ -250,16 +238,16 @@ export default function PhotographersListScreen({ navigation, route }) {
   const applyFilters = () => {
     setFilterModal(false);
     setPage(1);
-    fetchPhotographers(1, false);
+    fetchGuiders(1, false);
   };
 
   const resetFilters = () => {
     setSortBy("rating");
     setMinRating(0);
-    setPriceRange({ min: 0, max: 50000 });
+    setPriceRange({ min: 0, max: 10000 });
     setFilterModal(false);
     setPage(1);
-    fetchPhotographers(1, false);
+    fetchGuiders(1, false);
   };
 
   const onDateChange = (event, selectedDate) => {
@@ -269,29 +257,40 @@ export default function PhotographersListScreen({ navigation, route }) {
     }
   };
 
-  const renderPhotographerCard = ({ item }) => (
+  const timeSlots = [
+    "09:00 AM - 10:00 AM",
+    "10:00 AM - 11:00 AM",
+    "11:00 AM - 12:00 PM",
+    "12:00 PM - 01:00 PM",
+    "01:00 PM - 02:00 PM",
+    "02:00 PM - 03:00 PM",
+    "03:00 PM - 04:00 PM",
+    "04:00 PM - 05:00 PM",
+  ];
+
+  const renderGuiderCard = ({ item }) => (
     <TouchableOpacity
-      style={styles.photographerCard}
-      onPress={() => handlePhotographerPress(item)}
+      style={styles.guiderCard}
+      onPress={() => handleGuiderPress(item)}
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
         {item.featuredImage ? (
           <Image
             source={{ uri: getImageUrl(item.featuredImage) }}
-            style={styles.photographerImage}
+            style={styles.guiderImage}
           />
         ) : (
-          <View style={[styles.photographerImage, styles.imagePlaceholder]}>
+          <View style={[styles.guiderImage, styles.imagePlaceholder]}>
             <Text style={styles.placeholderText}>
-              {item.firmName?.charAt(0) || item.name?.charAt(0) || "P"}
+              {item.firmName?.charAt(0) || item.name?.charAt(0) || "G"}
             </Text>
           </View>
         )}
 
-        <View style={styles.photographerInfo}>
-          <Text style={styles.photographerName}>
-            {item.firmName || item.name || "Photographer"}
+        <View style={styles.guiderInfo}>
+          <Text style={styles.guiderName}>
+            {item.firmName || item.name || "Tour Guide"}
           </Text>
           <View style={styles.ratingContainer}>
             {renderRating(item.rating)}
@@ -300,7 +299,7 @@ export default function PhotographersListScreen({ navigation, route }) {
           <View style={styles.locationContainer}>
             <Ionicons name="location-outline" size={14} color="#64748b" />
             <Text style={styles.locationText} numberOfLines={1}>
-              {item.placeName || "Local Photographer"}
+              {item.placeName || "Local Guide"}
             </Text>
           </View>
         </View>
@@ -309,8 +308,8 @@ export default function PhotographersListScreen({ navigation, route }) {
       <View style={styles.cardFooter}>
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Ionicons name="camera-outline" size={14} color="#64748b" />
-            <Text style={styles.statText}>{item.totalBookings || 0} shoots</Text>
+            <Ionicons name="people-outline" size={14} color="#64748b" />
+            <Text style={styles.statText}>{item.totalBookings || 0} tours</Text>
           </View>
           <View style={styles.statItem}>
             <Ionicons name="time-outline" size={14} color="#64748b" />
@@ -327,7 +326,7 @@ export default function PhotographersListScreen({ navigation, route }) {
       </View>
 
       <LinearGradient
-        colors={["#8B5CF6", "#7C3AED"]}
+        colors={["#2c5a73", "#1e3c4f"]}
         style={styles.bookBadge}
       >
         <Text style={styles.bookBadgeText}>Book Now</Text>
@@ -378,7 +377,7 @@ export default function PhotographersListScreen({ navigation, route }) {
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filter Photographers</Text>
+            <Text style={styles.modalTitle}>Filter Guides</Text>
             <TouchableOpacity onPress={() => setFilterModal(false)}>
               <Ionicons name="close" size={24} color="#64748b" />
             </TouchableOpacity>
@@ -448,7 +447,7 @@ export default function PhotographersListScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.applyBtn} onPress={applyFilters}>
                 <LinearGradient
-                  colors={["#8B5CF6", "#7C3AED"]}
+                  colors={["#2c5a73", "#1e3c4f"]}
                   style={styles.applyGradient}
                 >
                   <Text style={styles.applyBtnText}>Apply Filters</Text>
@@ -475,7 +474,7 @@ export default function PhotographersListScreen({ navigation, route }) {
       <View style={styles.modalContainer}>
         <View style={[styles.modalContent, styles.bookingModalContent]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Book Photography Session</Text>
+            <Text style={styles.modalTitle}>Book Your Tour</Text>
             <TouchableOpacity
               onPress={() => {
                 setBookingModal(false);
@@ -486,39 +485,39 @@ export default function PhotographersListScreen({ navigation, route }) {
             </TouchableOpacity>
           </View>
 
-          {selectedPhotographer && (
+          {selectedGuider && (
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Photographer Info */}
-              <View style={styles.selectedPhotographerInfo}>
-                {selectedPhotographer.featuredImage ? (
+              {/* Guide Info */}
+              <View style={styles.selectedGuideInfo}>
+                {selectedGuider.featuredImage ? (
                   <Image
-                    source={{ uri: getImageUrl(selectedPhotographer.featuredImage) }}
-                    style={styles.selectedPhotographerImage}
+                    source={{ uri: getImageUrl(selectedGuider.featuredImage) }}
+                    style={styles.selectedGuideImage}
                   />
                 ) : (
-                  <View style={[styles.selectedPhotographerImage, styles.imagePlaceholder]}>
+                  <View style={[styles.selectedGuideImage, styles.imagePlaceholder]}>
                     <Text style={styles.placeholderText}>
-                      {selectedPhotographer.firmName?.charAt(0) ||
-                        selectedPhotographer.name?.charAt(0) ||
-                        "P"}
+                      {selectedGuider.firmName?.charAt(0) ||
+                        selectedGuider.name?.charAt(0) ||
+                        "G"}
                     </Text>
                   </View>
                 )}
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.selectedPhotographerName}>
-                    {selectedPhotographer.firmName || selectedPhotographer.name || "Photographer"}
+                  <Text style={styles.selectedGuideName}>
+                    {selectedGuider.firmName || selectedGuider.name || "Tour Guide"}
                   </Text>
                   <View style={styles.ratingContainer}>
-                    {renderRating(selectedPhotographer.rating)}
+                    {renderRating(selectedGuider.rating)}
                     <Text style={styles.ratingText}>
-                      ({selectedPhotographer.rating?.toFixed(1) || "0.0"})
+                      ({selectedGuider.rating?.toFixed(1) || "0.0"})
                     </Text>
                   </View>
                 </View>
               </View>
 
               {/* Select Service */}
-              <Text style={styles.sectionSubtitle}>Select Photography Package</Text>
+              <Text style={styles.sectionSubtitle}>Select Service Package</Text>
               <FlatList
                 data={services}
                 keyExtractor={(item) => item.id?.toString()}
@@ -528,7 +527,7 @@ export default function PhotographersListScreen({ navigation, route }) {
                   <View style={styles.emptyServices}>
                     <Ionicons name="cube-outline" size={40} color="#94a3b8" />
                     <Text style={styles.emptyServicesText}>
-                      No packages available for this photographer
+                      No services available for this guide
                     </Text>
                   </View>
                 }
@@ -540,7 +539,7 @@ export default function PhotographersListScreen({ navigation, route }) {
                 style={styles.dateSelector}
                 onPress={() => setShowDatePicker(true)}
               >
-                <Ionicons name="calendar-outline" size={20} color="#8B5CF6" />
+                <Ionicons name="calendar-outline" size={20} color="#2c5a73" />
                 <Text style={styles.dateText}>
                   {date.toLocaleDateString("en-IN", {
                     weekday: "short",
@@ -589,7 +588,7 @@ export default function PhotographersListScreen({ navigation, route }) {
               <Text style={styles.sectionSubtitle}>Additional Notes</Text>
               <TextInput
                 style={[styles.input, styles.notesInput]}
-                placeholder="Any special requirements or preferences?"
+                placeholder="Any special requests or requirements?"
                 placeholderTextColor="#94a3b8"
                 value={notes}
                 onChangeText={setNotes}
@@ -603,7 +602,7 @@ export default function PhotographersListScreen({ navigation, route }) {
                 <View style={styles.priceSummary}>
                   <Text style={styles.priceSummaryTitle}>Price Summary</Text>
                   <View style={styles.priceRow}>
-                    <Text style={styles.priceLabel}>Package Price</Text>
+                    <Text style={styles.priceLabel}>Service Charge</Text>
                     <Text style={styles.priceValue}>₹{selectedService.servicePrice}</Text>
                   </View>
                   <View style={styles.priceRow}>
@@ -638,7 +637,7 @@ export default function PhotographersListScreen({ navigation, route }) {
                   disabled={bookingLoading || !selectedService}
                 >
                   <LinearGradient
-                    colors={["#8B5CF6", "#7C3AED"]}
+                    colors={["#2c5a73", "#1e3c4f"]}
                     style={styles.confirmGradient}
                   >
                     {bookingLoading ? (
@@ -669,7 +668,7 @@ export default function PhotographersListScreen({ navigation, route }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Photographers</Text>
+          <Text style={styles.headerTitle}>Tour Guides</Text>
           <TouchableOpacity onPress={() => setFilterModal(true)} style={styles.filterBtn}>
             <Ionicons name="options-outline" size={24} color="#fff" />
           </TouchableOpacity>
@@ -680,7 +679,7 @@ export default function PhotographersListScreen({ navigation, route }) {
           <Ionicons name="search-outline" size={20} color="#94a3b8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search photographers by name or location..."
+            placeholder="Search guides by name or location..."
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -694,21 +693,21 @@ export default function PhotographersListScreen({ navigation, route }) {
 
         {/* Results Count */}
         <Text style={styles.resultsCount}>
-          {filteredPhotographers.length} photographers found
+          {filteredGuiders.length} guides found
         </Text>
       </LinearGradient>
 
-      {/* Photographers List */}
+      {/* Guiders List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Finding best photographers for you...</Text>
+          <ActivityIndicator size="large" color="#2c5a73" />
+          <Text style={styles.loadingText}>Finding best guides for you...</Text>
         </View>
       ) : (
         <FlatList
-          data={filteredPhotographers}
+          data={filteredGuiders}
           keyExtractor={(item) => item.id?.toString()}
-          renderItem={renderPhotographerCard}
+          renderItem={renderGuiderCard}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -719,14 +718,14 @@ export default function PhotographersListScreen({ navigation, route }) {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#8B5CF6" />
+                <ActivityIndicator size="small" color="#2c5a73" />
               </View>
             ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="camera-outline" size={64} color="#cbd5e1" />
-              <Text style={styles.emptyTitle}>No Photographers Found</Text>
+              <Ionicons name="people-outline" size={64} color="#cbd5e1" />
+              <Text style={styles.emptyTitle}>No Guides Found</Text>
               <Text style={styles.emptyText}>
                 Try adjusting your filters or search query
               </Text>
@@ -799,7 +798,7 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 8,
   },
-  photographerCard: {
+  guiderCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
@@ -815,14 +814,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 12,
   },
-  photographerImage: {
+  guiderImage: {
     width: 70,
     height: 70,
     borderRadius: 35,
     marginRight: 12,
   },
   imagePlaceholder: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -831,10 +830,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
   },
-  photographerInfo: {
+  guiderInfo: {
     flex: 1,
   },
-  photographerName: {
+  guiderName: {
     fontSize: 16,
     fontWeight: "700",
     color: "#1e293b",
@@ -938,7 +937,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   resetFiltersBtn: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -995,7 +994,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sortOptionSelected: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
   },
   sortOptionText: {
     fontSize: 13,
@@ -1017,7 +1016,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   ratingOptionSelected: {
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
   },
   ratingOptionText: {
     fontSize: 13,
@@ -1065,7 +1064,7 @@ const styles = StyleSheet.create({
   },
 
   // Booking Modal Styles
-  selectedPhotographerInfo: {
+  selectedGuideInfo: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f8fafc",
@@ -1073,12 +1072,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
   },
-  selectedPhotographerImage: {
+  selectedGuideImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
   },
-  selectedPhotographerName: {
+  selectedGuideName: {
     fontSize: 14,
     fontWeight: "600",
     color: "#1e293b",
@@ -1101,8 +1100,8 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   selectedServiceCard: {
-    borderColor: "#8B5CF6",
-    backgroundColor: "#f3e8ff",
+    borderColor: "#2c5a73",
+    backgroundColor: "#f0f7fa",
   },
   serviceImage: {
     width: 60,
@@ -1133,7 +1132,7 @@ const styles = StyleSheet.create({
   servicePrice: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#8B5CF6",
+    color: "#2c5a73",
   },
   serviceDuration: {
     fontSize: 11,
@@ -1186,8 +1185,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   timeSlotSelected: {
-    backgroundColor: "#8B5CF6",
-    borderColor: "#8B5CF6",
+    backgroundColor: "#2c5a73",
+    borderColor: "#2c5a73",
   },
   timeSlotText: {
     fontSize: 12,
@@ -1250,7 +1249,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#8B5CF6",
+    color: "#2c5a73",
   },
   modalActions: {
     flexDirection: "row",

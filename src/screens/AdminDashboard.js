@@ -530,8 +530,8 @@ export default function AdminDashboard({ navigation }) {
               <Icon name="menu" size={28} color="#fff" />
             </TouchableOpacity>
             <View>
-              <Text style={styles.greeting}>{greeting}, Admin!</Text>
-              <Text style={styles.subtitle}>Dashboard Overview</Text>
+              <Text style={styles.greeting}>{greeting}</Text>
+              {/* <Text style={styles.subtitle}>Dashboard Overview</Text> */}
             </View>
           </View>
           
